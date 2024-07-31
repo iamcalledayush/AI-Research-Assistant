@@ -13,7 +13,7 @@ import json
 # Load environment variables from the .env file
 # load_dotenv("key.env")
 # gemini_api_key = os.getenv("GEMINI_API_KEY")
-gemini_api_key = "Put your apin key here!"
+gemini_api_key = "Put your api key here!"
 
 # Initialize the Hugging Face model for embeddings
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
