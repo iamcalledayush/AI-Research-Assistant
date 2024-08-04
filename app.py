@@ -1,32 +1,45 @@
 import gradio as gr
-from langchain_community.document_loaders import YoutubeLoader
+from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled, TooManyRequests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
 import faiss
 import requests
-from dotenv import find_dotenv, load_dotenv
+from dotenv import load_dotenv
 import textwrap
 import os
 import json
+import time
 
 # Load environment variables from the .env file
-# load_dotenv("key.env")
-# gemini_api_key = os.getenv("GEMINI_API_KEY")
-gemini_api_key = "Put your api key here!"
+load_dotenv()
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 
 # Initialize the Hugging Face model for embeddings
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
+def get_youtube_transcript(video_url: str):
+    video_id = video_url.split('v=')[-1]
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        return transcript
+    except NoTranscriptFound:
+        raise Exception("No transcript found for the video.")
+    except TranscriptsDisabled:
+        raise Exception("Transcripts are disabled for this video.")
+    except TooManyRequests:
+        raise Exception("Too many requests to YouTube. Try again later.")
+    except Exception as e:
+        raise Exception(f"An error occurred: {e}")
+
 def create_db_from_youtube_video_url(video_url: str):
-    loader = YoutubeLoader.from_youtube_url(video_url)
-    transcript = loader.load()
+    transcript = get_youtube_transcript(video_url)
+    transcript_text = " ".join([entry['text'] for entry in transcript])
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    docs = text_splitter.split_documents(transcript)
+    docs = text_splitter.split_text(transcript_text)
 
     # Generate embeddings for the documents
-    docs_content = [doc.page_content for doc in docs]
+    docs_content = [doc for doc in docs]
     embeddings = embedding_model.encode(docs_content)
 
     # Initialize FAISS index
@@ -40,7 +53,7 @@ def get_response_from_query(docs, index, query, k=4):
     query_embedding = embedding_model.encode([query])
     distances, indices = index.search(query_embedding, k)
 
-    docs_page_content = " ".join([docs[idx].page_content for idx in indices[0]])
+    docs_page_content = " ".join([docs[idx] for idx in indices[0]])
 
     # Use Gemini API for generating response
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_api_key}"
@@ -96,4 +109,4 @@ inputs = [
 outputs = gr.Textbox(label="Output")
 
 demo = gr.Interface(fn=process_inputs, inputs=inputs, outputs=outputs)
-demo.launch()
+demo.launch(share=True)
