@@ -1,48 +1,27 @@
-import gradio as gr
-from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled, TooManyRequests
+import streamlit as st
+from langchain_community.document_loaders import YoutubeLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 import faiss
 import requests
-from dotenv import load_dotenv
-import textwrap
-import os
 import json
-import time
+from dotenv import find_dotenv, load_dotenv
+import os
 
-# Load environment variables from the .env file
 load_dotenv()
 gemini_api_key = os.getenv("GEMINI_API_KEY")
-
-# Initialize the Hugging Face model for embeddings
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-def get_youtube_transcript(video_url: str):
-    video_id = video_url.split('v=')[-1]
-    try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
-        return transcript
-    except NoTranscriptFound:
-        raise Exception("No transcript found for the video.")
-    except TranscriptsDisabled:
-        raise Exception("Transcripts are disabled for this video.")
-    except TooManyRequests:
-        raise Exception("Too many requests to YouTube. Try again later.")
-    except Exception as e:
-        raise Exception(f"An error occurred: {e}")
-
 def create_db_from_youtube_video_url(video_url: str):
-    transcript = get_youtube_transcript(video_url)
-    transcript_text = " ".join([entry['text'] for entry in transcript])
+    loader = YoutubeLoader.from_youtube_url(video_url)
+    transcript = loader.load()
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    docs = text_splitter.split_text(transcript_text)
+    docs = text_splitter.split_documents(transcript)
 
-    # Generate embeddings for the documents
-    docs_content = [doc for doc in docs]
+    docs_content = [doc.page_content for doc in docs]
     embeddings = embedding_model.encode(docs_content)
 
-    # Initialize FAISS index
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
@@ -53,9 +32,8 @@ def get_response_from_query(docs, index, query, k=4):
     query_embedding = embedding_model.encode([query])
     distances, indices = index.search(query_embedding, k)
 
-    docs_page_content = " ".join([docs[idx] for idx in indices[0]])
+    docs_page_content = " ".join([docs[idx].page_content for idx in indices[0]])
 
-    # Use Gemini API for generating response
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_api_key}"
     headers = {
         "Content-Type": "application/json"
@@ -68,19 +46,28 @@ def get_response_from_query(docs, index, query, k=4):
 
     try:
         response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        response.raise_for_status()
         response_data = response.json()
     except requests.exceptions.RequestException as e:
         return f"Request error: {e}", None
     except ValueError as e:
         return f"JSON decoding error: {e} - Response content: {response.text}", None
 
-    print("Full Response Data:", json.dumps(response_data, indent=2))  # Log the entire response
+    if 'candidates' not in response_data:
+        return f"Error: 'candidates' not found in response.", None
 
-    if response.status_code != 200:
-        return f"Error: {response_data.get('error', {}).get('message', 'Unknown error')}", None
+    if not response_data['candidates']:
+        return f"Error: 'candidates' list is empty.", None
 
-    # Access the generated text correctly
+    if 'content' not in response_data['candidates'][0]:
+        return f"Error: 'content' not found in the first candidate.", None
+
+    if 'parts' not in response_data['candidates'][0]['content']:
+        return f"Error: 'parts' not found in the content of the first candidate.", None
+
+    if not response_data['candidates'][0]['content']['parts']:
+        return f"Error: 'parts' list is empty.", None
+
     try:
         generated_text = response_data['candidates'][0]['content']['parts'][0]['text']
     except (KeyError, IndexError) as e:
@@ -88,25 +75,35 @@ def get_response_from_query(docs, index, query, k=4):
 
     return generated_text, docs
 
-def process_inputs(name, link):
-    try:
-        video_url = link
-        query = name
+# Streamlit interface
+st.title("YouTube Query Assistant")
 
+st.write("""
+## Welcome to the YouTube Query Assistant!
+
+This AI-powered tool is designed to save you time by providing precise answers to your queries about any YouTube video.
+
+## Why Use This Tool?
+- **Time-Saving**: No need to scrub through long videos. Get the answers you need in seconds.
+- **Precision**: Target specific content within a video without watching it in full.
+- **Informed Viewing**: Know in advance if the video covers the topic you’re interested in.
+
+## How It Works:
+1. **Enter the YouTube Video URL**: Provide the link to the YouTube video you want to query.
+2. **Ask Your Question**: Type in the specific information you're looking for within the video.
+3. **Get Instant Results**: The AI processes the video content and returns the most relevant information, helping you quickly determine if the video contains what you need.
+""")
+
+video_url = st.text_input("Enter YouTube video URL")
+query = st.text_input("Enter your query")
+
+if st.button("Get Response"):
+    if video_url and query:
         docs, index = create_db_from_youtube_video_url(video_url)
         response, docs = get_response_from_query(docs, index, query)
-        if docs is None:  # Handle errors from get_response_from_query
-            return response
-        return textwrap.fill(response, width=85)
-    except Exception as e:
-        return str(e)
-
-inputs = [
-    gr.Textbox(label="Query"),
-    gr.Textbox(label="Link")
-]
-
-outputs = gr.Textbox(label="Output")
-
-demo = gr.Interface(fn=process_inputs, inputs=inputs, outputs=outputs)
-demo.launch(share=True)
+        if docs is None:
+            st.error(response)
+        else:
+            st.write(response)
+    else:
+        st.warning("Please enter both the video URL and query.")
