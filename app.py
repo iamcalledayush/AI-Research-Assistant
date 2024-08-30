@@ -10,7 +10,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from sentence_transformers import SentenceTransformer
 from langchain.docstore import InMemoryDocstore
 import faiss
-from langchain.docstore.base import Document
+from langchain.docstore.document import Document
 
 # Set up Google API Key directly in the code
 GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
