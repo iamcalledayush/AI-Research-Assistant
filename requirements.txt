@@ -6,3 +6,4 @@ PyPDF2==3.0.1
 google-auth==2.21.0
 requests==2.31.0
 arxiv==1.4.4
+pillow
