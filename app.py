@@ -1,109 +1,105 @@
-import streamlit as st
-from langchain_community.document_loaders import YoutubeLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
-import faiss
-import requests
-import json
-from dotenv import find_dotenv, load_dotenv
 import os
+import requests
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import FAISS
+from langchain.chains import load_qa_chain
+from langchain.embeddings import SentenceTransformerEmbeddings
+from langchain.llms import Gemini
+from PyPDF2 import PdfReader
+from arxiv import Search, SortCriterion
+import streamlit as st
 
-load_dotenv()
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+# Initialize components
+embedding_model = SentenceTransformerEmbeddings('all-MiniLM-L6-v2')
+gemini_api_key = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
+llm = Gemini(model="gemini-1.5-flash-latest", api_key=gemini_api_key)
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
-def create_db_from_youtube_video_url(video_url: str):
-    loader = YoutubeLoader.from_youtube_url(video_url)
-    transcript = loader.load()
+def download_arxiv_pdf(arxiv_url: str, download_dir: str = "./pdfs/") -> str:
+    if not os.path.exists(download_dir):
+        os.makedirs(download_dir)
+        
+    search = Search(query=arxiv_url, sort_by=SortCriterion.Relevance)
+    results = list(search.results())
+    
+    if not results:
+        return None, f"Failed to find paper with URL: {arxiv_url}"
+    
+    paper = results[0]
+    pdf_url = paper.pdf_url
+    response = requests.get(pdf_url)
+    
+    if response.status_code == 200:
+        pdf_path = os.path.join(download_dir, f"{paper.entry_id}.pdf")
+        with open(pdf_path, "wb") as f:
+            f.write(response.content)
+        return pdf_path, None
+    else:
+        return None, "Error downloading PDF"
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    docs = text_splitter.split_documents(transcript)
+def parse_and_create_db(pdf_paths: list):
+    documents = []
+    
+    for pdf_path in pdf_paths:
+        with open(pdf_path, "rb") as f:
+            reader = PdfReader(f)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text()
+        
+        docs = text_splitter.split_text(text)
+        documents.extend(docs)
+    
+    embeddings = embedding_model.embed_documents(documents)
+    faiss_index = FAISS(embeddings)
+    
+    return documents, faiss_index
 
-    docs_content = [doc.page_content for doc in docs]
-    embeddings = embedding_model.encode(docs_content)
+def query_papers(query: str, faiss_index, documents):
+    chain = load_qa_chain(llm=llm, chain_type="refine", retriever=faiss_index)
+    results = chain.run(query=query, documents=documents)
+    
+    return results
 
-    dimension = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dimension)
-    index.add(embeddings)
-
-    return docs, index
-
-def get_response_from_query(docs, index, query, k=4):
-    query_embedding = embedding_model.encode([query])
-    distances, indices = index.search(query_embedding, k)
-
-    docs_page_content = " ".join([docs[idx].page_content for idx in indices[0]])
-
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_api_key}"
-    headers = {
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "contents": [
-            {"parts": [{"text": f"Question: {query}\nDocs: {docs_page_content}"}]}
-        ]
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        response_data = response.json()
-    except requests.exceptions.RequestException as e:
-        return f"Request error: {e}", None
-    except ValueError as e:
-        return f"JSON decoding error: {e} - Response content: {response.text}", None
-
-    if 'candidates' not in response_data:
-        return f"Error: 'candidates' not found in response.", None
-
-    if not response_data['candidates']:
-        return f"Error: 'candidates' list is empty.", None
-
-    if 'content' not in response_data['candidates'][0]:
-        return f"Error: 'content' not found in the first candidate.", None
-
-    if 'parts' not in response_data['candidates'][0]['content']:
-        return f"Error: 'parts' not found in the content of the first candidate.", None
-
-    if not response_data['candidates'][0]['content']['parts']:
-        return f"Error: 'parts' list is empty.", None
-
-    try:
-        generated_text = response_data['candidates'][0]['content']['parts'][0]['text']
-    except (KeyError, IndexError) as e:
-        return f"Error accessing response content: {e}", None
-
-    return generated_text, docs
+def related_papers(query: str, faiss_index, documents):
+    related_titles = [doc['title'] for doc in documents]  # Assuming titles are stored
+    return related_titles
 
 # Streamlit interface
-st.title("YouTube Query Assistant")
+st.title("ArXiv Paper Query Assistant")
 
 st.write("""
-## Welcome to the YouTube Query Assistant!
+## Query Your Favorite ArXiv Papers!
 
-This AI-powered tool is designed to save you time by providing precise answers to your queries about any YouTube video.
-
-## Why Use This Tool?
-- **Time-Saving**: No need to scrub through long videos. Get the answers you need in seconds.
-- **Precision**: Target specific content within a video without watching it in full.
-- **Informed Viewing**: Know in advance if the video covers the topic you’re interested in.
-
-## How It Works:
-1. **Enter the YouTube Video URL**: Provide the link to the YouTube video you want to query.
-2. **Ask Your Question**: Type in the specific information you're looking for within the video.
-3. **Get Instant Results**: The AI processes the video content and returns the most relevant information, helping you quickly determine if the video contains what you need.
+- **Upload Papers**: Provide the arXiv links to the papers you want to query.
+- **Ask Your Questions**: Enter your query to get precise answers from the uploaded papers.
 """)
 
-video_url = st.text_input("Enter YouTube video URL")
+arxiv_links = st.text_area("Enter arXiv paper URLs (one per line):").splitlines()
 query = st.text_input("Enter your query")
 
 if st.button("Get Response"):
-    if video_url and query:
-        docs, index = create_db_from_youtube_video_url(video_url)
-        response, docs = get_response_from_query(docs, index, query)
-        if docs is None:
-            st.error(response)
-        else:
+    if arxiv_links and query:
+        pdf_paths = []
+        for link in arxiv_links:
+            pdf_path, error = download_arxiv_pdf(link)
+            if error:
+                st.error(error)
+            else:
+                pdf_paths.append(pdf_path)
+        
+        if pdf_paths:
+            documents, faiss_index = parse_and_create_db(pdf_paths)
+            response = query_papers(query, faiss_index, documents)
+            related_titles = related_papers(query, faiss_index, documents)
+            
+            st.write("**Response:**")
             st.write(response)
+            
+            st.write("**Related Papers:**")
+            for title in related_titles:
+                st.write(title)
+        else:
+            st.error("No valid PDFs found.")
     else:
-        st.warning("Please enter both the video URL and query.")
+        st.warning("Please enter arXiv links and a query.")
