@@ -88,9 +88,10 @@ def query_papers(query: str, faiss_index, documents):
     chain = load_qa_chain(llm=llm, chain_type="refine")
     
     # Run the chain on the retrieved documents
-    results = chain.run(input_documents=docs, question=query)
+    # Only return the final refined answer
+    final_answer = chain.run(input_documents=docs, question=query)
     
-    return results
+    return final_answer
 
 def related_papers(query: str, faiss_index, documents):
     # Perform the retrieval step
@@ -100,7 +101,6 @@ def related_papers(query: str, faiss_index, documents):
     related_titles = []
     for doc in docs:
         # Attempt to extract a title from the document
-        # If the document is just a string, use the first sentence or something similar as a "title"
         first_line = doc.page_content.split('\n', 1)[0]
         related_titles.append(first_line)
     
