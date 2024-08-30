@@ -8,14 +8,14 @@ from PyPDF2 import PdfReader
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from sentence_transformers import SentenceTransformer
-
-
+from langchain.docstore import InMemoryDocstore
+import faiss
 
 # Set up Google API Key directly in the code
 GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
 
 # Initialize components
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+embedding_model = SentenceTransformerEmbeddings('all-MiniLM-L6-v2')
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-pro",
     api_key=GOOGLE_API_KEY,  # Pass the API key here
@@ -60,8 +60,15 @@ def parse_and_create_db(pdf_paths: list):
         docs = text_splitter.split_text(text)
         documents.extend(docs)
     
-    embeddings = embedding_model.encode(documents)
-    faiss_index = FAISS(embeddings)
+    # Create FAISS index
+    embeddings = embedding_model.embed_documents(documents)
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(embeddings)
+
+    # Map documents to the FAISS index
+    docstore = InMemoryDocstore({i: Document(page_content=doc) for i, doc in enumerate(documents)})
+    faiss_index = FAISS(index, docstore, {i: i for i in range(len(documents))})
     
     return documents, faiss_index
 
