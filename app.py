@@ -4,7 +4,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.embeddings import SentenceTransformerEmbeddings
-from langchain.llms import Gemini
 from PyPDF2 import PdfReader
 from arxiv import Search, SortCriterion
 import streamlit as st
