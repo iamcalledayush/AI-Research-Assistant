@@ -3,7 +3,6 @@ import requests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
-from langchain.embeddings import SentenceTransformerEmbeddings
 from PyPDF2 import PdfReader
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -16,7 +15,7 @@ from langchain.docstore.document import Document
 GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
 
 # Initialize components
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Direct use of SentenceTransformer
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",  # Use Gemini 1.5 Flash model here
     api_key=GOOGLE_API_KEY,  # Pass the API key here
@@ -62,7 +61,7 @@ def parse_and_create_db(pdf_paths: list):
         documents.extend(docs)
     
     # Create FAISS index
-    embeddings = embedding_model.embed_documents(documents)
+    embeddings = embedding_model.encode(documents)  # Using SentenceTransformer directly
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
