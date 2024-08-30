@@ -5,10 +5,11 @@ from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.embeddings import SentenceTransformerEmbeddings
 from PyPDF2 import PdfReader
-from arxiv import Search, SortCriterion
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from sentence_transformers import SentenceTransformer
+
+
 
 # Set up Google API Key directly in the code
 GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
@@ -29,24 +30,22 @@ text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=10
 def download_arxiv_pdf(arxiv_url: str, download_dir: str = "./pdfs/") -> str:
     if not os.path.exists(download_dir):
         os.makedirs(download_dir)
-        
-    search = Search(query=arxiv_url, sort_by=SortCriterion.Relevance)
-    results = list(search.results())
     
-    if not results:
-        return None, f"Failed to find paper with URL: {arxiv_url}"
+    # Extract the paper ID from the arXiv URL
+    paper_id = arxiv_url.split('/')[-1]
     
-    paper = results[0]
-    pdf_url = paper.pdf_url
+    # Construct the direct PDF URL
+    pdf_url = f"https://arxiv.org/pdf/{paper_id}.pdf"
+    
     response = requests.get(pdf_url)
     
     if response.status_code == 200:
-        pdf_path = os.path.join(download_dir, f"{paper.entry_id}.pdf")
+        pdf_path = os.path.join(download_dir, f"{paper_id}.pdf")
         with open(pdf_path, "wb") as f:
             f.write(response.content)
         return pdf_path, None
     else:
-        return None, "Error downloading PDF"
+        return None, f"Error downloading PDF from {pdf_url}"
 
 def parse_and_create_db(pdf_paths: list):
     documents = []
