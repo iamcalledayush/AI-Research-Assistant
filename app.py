@@ -8,11 +8,23 @@ from langchain.llms import Gemini
 from PyPDF2 import PdfReader
 from arxiv import Search, SortCriterion
 import streamlit as st
+from langchain_google_genai import ChatGoogleGenerativeAI
+from sentence_transformers import SentenceTransformer
+
+# Set up Google API Key directly in the code
+GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
 
 # Initialize components
-embedding_model = SentenceTransformerEmbeddings('all-MiniLM-L6-v2')
-gemini_api_key = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
-llm = Gemini(model="gemini-1.5-flash-latest", api_key=gemini_api_key)
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-pro",
+    api_key=GOOGLE_API_KEY,  # Pass the API key here
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
+
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
 def download_arxiv_pdf(arxiv_url: str, download_dir: str = "./pdfs/") -> str:
@@ -50,7 +62,7 @@ def parse_and_create_db(pdf_paths: list):
         docs = text_splitter.split_text(text)
         documents.extend(docs)
     
-    embeddings = embedding_model.embed_documents(documents)
+    embeddings = embedding_model.encode(documents)
     faiss_index = FAISS(embeddings)
     
     return documents, faiss_index
