@@ -8,3 +8,4 @@ google-auth==2.21.0
 requests
 arxiv==1.4.4
 pillow
+langchain-google-genai
