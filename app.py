@@ -91,7 +91,7 @@ def query_papers(query: str, faiss_index, documents):
     initial_answer = chain.run(input_documents=docs, question=query)
     
     # Refine the initial answer by asking the LLM to focus on the required response
-    prompt = f"Please remove any unnecessary context or refinement process from the following response and return only the relevant information:\n\n{initial_answer}"
+    prompt = f"The following content is extracted from a research paper. Please process it accordingly:\n\n{initial_answer}\n\nNow, provide only the relevant information in response to the query."
     refined_response = llm.invoke(prompt)
     
     # Extract the text content from the refined response
