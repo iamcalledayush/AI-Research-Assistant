@@ -93,7 +93,17 @@ def query_papers(query: str, faiss_index, documents):
     return results
 
 def related_papers(query: str, faiss_index, documents):
-    related_titles = [doc['title'] for doc in documents]  # Assuming titles are stored
+    # Perform the retrieval step
+    docs = faiss_index.similarity_search(query, k=5)
+    
+    # Extract titles or relevant parts of the documents to display
+    related_titles = []
+    for doc in docs:
+        # Attempt to extract a title from the document
+        # If the document is just a string, use the first sentence or something similar as a "title"
+        first_line = doc.page_content.split('\n', 1)[0]
+        related_titles.append(first_line)
+    
     return related_titles
 
 # Streamlit interface
