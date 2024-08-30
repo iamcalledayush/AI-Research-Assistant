@@ -1,9 +1,9 @@
-streamlit==1.26.0
-langchain==0.0.162
+streamlit
+langchain
 faiss-cpu
-sentence-transformers==2.2.2
+sentence-transformers
 PyPDF2==3.0.1
 google-auth==2.21.0
-requests==2.31.0
+requests
 arxiv==1.4.4
 pillow
