@@ -88,8 +88,11 @@ def query_papers(query: str, faiss_index, documents):
     chain = load_qa_chain(llm=llm, chain_type="refine")
     
     # Run the chain on the retrieved documents
-    # Only return the final refined answer
-    final_answer = chain.run(input_documents=docs, question=query)
+    initial_answer = chain.run(input_documents=docs, question=query)
+    
+    # Refine the initial answer by asking the LLM to focus on the required response
+    prompt = f"Please remove any unnecessary context or refinement process from the following response and return only the relevant information:\n\n{initial_answer}"
+    final_answer = llm.invoke(prompt)
     
     return final_answer
 
