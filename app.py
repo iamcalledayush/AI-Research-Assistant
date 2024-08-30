@@ -16,7 +16,7 @@ from langchain.docstore.document import Document
 GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
 
 # Initialize components
-embedding_model = SentenceTransformerEmbeddings('all-MiniLM-L6-v2')
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",  # Use Gemini 1.5 Flash model here
     api_key=GOOGLE_API_KEY,  # Pass the API key here
