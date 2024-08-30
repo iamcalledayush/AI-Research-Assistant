@@ -81,8 +81,14 @@ def parse_and_create_db(pdf_paths: list):
     return documents, faiss_index
 
 def query_papers(query: str, faiss_index, documents):
-    chain = load_qa_chain(llm=llm, chain_type="refine", retriever=faiss_index)
-    results = chain.run(query=query, documents=documents)
+    # Perform the retrieval step
+    docs = faiss_index.similarity_search(query, k=5)
+    
+    # Load the QA chain
+    chain = load_qa_chain(llm=llm, chain_type="refine")
+    
+    # Run the chain on the retrieved documents
+    results = chain.run(input_documents=docs, question=query)
     
     return results
 
