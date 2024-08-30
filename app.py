@@ -92,7 +92,10 @@ def query_papers(query: str, faiss_index, documents):
     
     # Refine the initial answer by asking the LLM to focus on the required response
     prompt = f"Please remove any unnecessary context or refinement process from the following response and return only the relevant information:\n\n{initial_answer}"
-    final_answer = llm.invoke(prompt)
+    refined_response = llm.invoke(prompt)
+    
+    # Extract the text content from the refined response
+    final_answer = refined_response.content
     
     return final_answer
 
