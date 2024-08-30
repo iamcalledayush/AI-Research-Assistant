@@ -10,6 +10,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from sentence_transformers import SentenceTransformer
 from langchain.docstore import InMemoryDocstore
 import faiss
+from langchain.docstore.base import Document
 
 # Set up Google API Key directly in the code
 GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
@@ -17,7 +18,7 @@ GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
 # Initialize components
 embedding_model = SentenceTransformerEmbeddings('all-MiniLM-L6-v2')
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-pro",
+    model="gemini-1.5-flash",  # Use Gemini 1.5 Flash model here
     api_key=GOOGLE_API_KEY,  # Pass the API key here
     temperature=0,
     max_tokens=None,
