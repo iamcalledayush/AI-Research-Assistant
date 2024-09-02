@@ -10,19 +10,25 @@ from langchain.docstore import InMemoryDocstore
 import faiss
 from langchain.docstore.document import Document
 
-# Set up Google API Key directly in the code
-GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
+# Set up the two Google API Keys directly in the code
+SUMMARY_API_KEY = "AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU"
+FINAL_RESPONSE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
 
 # Initialize components
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Direct use of SentenceTransformer
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-pro",  # Use Gemini 1.5 Pro model here
-    api_key=GOOGLE_API_KEY,  # Pass the API key here
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-)
+
+def get_llm(api_key):
+    return ChatGoogleGenerativeAI(
+        model="gemini-1.5-pro",  # Use Gemini 1.5 Pro model here
+        api_key=api_key,  # Pass the respective API key
+        temperature=0,
+        max_tokens=None,
+        timeout=None,
+        max_retries=2,
+    )
+
+summary_llm = get_llm(SUMMARY_API_KEY)
+final_response_llm = get_llm(FINAL_RESPONSE_API_KEY)
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
@@ -57,16 +63,16 @@ def parse_and_create_db(pdf_paths: list):
                 text += page.extract_text()
         
         docs = text_splitter.split_text(text)
-        documents.extend([Document(page_content=doc) for doc in docs])
+        documents.extend(docs)
     
     # Create FAISS index
-    embeddings = embedding_model.encode([doc.page_content for doc in documents])  # Using SentenceTransformer directly
+    embeddings = embedding_model.encode(documents)  # Using SentenceTransformer directly
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
 
     # Map documents to the FAISS index
-    docstore = InMemoryDocstore({i: doc for i, doc in enumerate(documents)})
+    docstore = InMemoryDocstore({i: Document(page_content=doc) for i, doc in enumerate(documents)})
     index_to_docstore_id = {i: i for i in range(len(documents))}
     
     # Initialize FAISS with the embedding function
@@ -79,30 +85,33 @@ def parse_and_create_db(pdf_paths: list):
     
     return documents, faiss_index
 
-def summarize_paper(paper_content: str):
+def summarize_paper(paper_content):
+    # Create a prompt for generating a medium-length summary
     prompt = (
-        "Please provide a medium-length summary that includes all important points from this paper "
-        "and avoids mentioning any related papers:\n\n"
-        + paper_content
+        f"Summarize the following paper content in a medium-length summary, focusing on the main points, and excluding any related papers:\n\n"
+        f"{paper_content}"
     )
-    summary = llm.invoke(prompt)
+    
+    summary = summary_llm.invoke(prompt)
+    
     return summary.content
 
 def query_papers_combined(query: str, summaries: list):
-    # Combine all summaries into a single prompt with clear labeling
+    # Combine all summaries into a single prompt with clear separation
     combined_summaries = "\n\n".join([f"Paper {i+1} Summary:\n{summary}" for i, summary in enumerate(summaries)])
     
-    # Create a prompt that instructs the LLM to focus only on the summaries provided
+    # Create a prompt that instructs the LLM to focus only on the given summaries' content
     prompt = (
-        "The following summaries are extracted from multiple research papers. "
-        "Each summary is separated and labeled. Please focus solely on answering the question based on the given summaries:\n\n"
+        "The following are summaries of multiple research papers. "
+        "Each summary is separated and labeled. Please focus solely on these summaries "
+        "and answer the following question based on the summaries provided:\n\n"
         + combined_summaries
         + "\n\nQuestion: "
         + query
     )
     
-    # Make a single LLM call with the combined prompt
-    final_answer = llm.invoke(prompt)
+    # Make a single LLM call with the combined summaries
+    final_answer = final_response_llm.invoke(prompt)
     
     return final_answer.content
 
@@ -133,13 +142,13 @@ if st.button("Get Response"):
             if pdf_paths:
                 documents, faiss_index = parse_and_create_db(pdf_paths)
                 
-                # Generate summaries for each paper
+                # Summarize each paper individually
                 summaries = []
-                for i, doc in enumerate(documents):
+                for doc in documents:
                     summary = summarize_paper(doc.page_content)
                     summaries.append(summary)
                 
-                # Perform a combined LLM call with all summaries
+                # Perform a combined LLM call using the final response API key
                 combined_response = query_papers_combined(query, summaries)
                 
                 # Display the results
