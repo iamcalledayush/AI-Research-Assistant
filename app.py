@@ -87,10 +87,12 @@ def query_papers(query: str, faiss_index, documents):
     # Use the 'map_reduce' method for better handling of multiple documents
     chain = load_qa_chain(llm=llm, chain_type="map_reduce")
     
-    # Run the chain on the retrieved documents
-    final_answer = chain.run(input_documents=docs, question=query)
+    # Refine the instruction to focus on the paper itself and avoid explaining related papers
+    prompt = f"The following content is extracted from a research paper. Please focus solely on explaining this specific paper without referring to or explaining any related papers that might be mentioned:\n\n"
+    combined_docs = "\n\n".join([doc.page_content for doc in docs])
+    final_answer = llm.invoke(prompt + combined_docs + "\n\nQuestion: " + query)
     
-    return final_answer
+    return final_answer.content
 
 # Streamlit interface
 st.title("ArXiv Paper Query Assistant")
