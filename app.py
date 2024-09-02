@@ -107,21 +107,22 @@ query = st.text_input("Enter your query")
 
 if st.button("Get Response"):
     if arxiv_links and query:
-        pdf_paths = []
-        for link in arxiv_links:
-            pdf_path, error = download_arxiv_pdf(link)
-            if error:
-                st.error(error)
-            else:
-                pdf_paths.append(pdf_path)
-        
-        if pdf_paths:
-            documents, faiss_index = parse_and_create_db(pdf_paths)
-            response = query_papers(query, faiss_index, documents)
+        with st.spinner('Processing your request...'):
+            pdf_paths = []
+            for link in arxiv_links:
+                pdf_path, error = download_arxiv_pdf(link)
+                if error:
+                    st.error(error)
+                else:
+                    pdf_paths.append(pdf_path)
             
-            st.write("**Response:**")
-            st.write(response)
-        else:
-            st.error("No valid PDFs found.")
+            if pdf_paths:
+                documents, faiss_index = parse_and_create_db(pdf_paths)
+                response = query_papers(query, faiss_index, documents)
+                
+                st.write("**Response:**")
+                st.write(response)
+            else:
+                st.error("No valid PDFs found.")
     else:
         st.warning("Please enter arXiv links and a query.")
