@@ -48,6 +48,7 @@ def download_arxiv_pdf(arxiv_url: str, download_dir: str = "./pdfs/") -> str:
 
 def parse_and_create_db(pdf_paths: list):
     documents = []
+    ids = []
     
     for pdf_path in pdf_paths:
         with open(pdf_path, "rb") as f:
@@ -66,8 +67,8 @@ def parse_and_create_db(pdf_paths: list):
     index.add(embeddings)
 
     # Map documents to the FAISS index
-    docstore = InMemoryDocstore({i: Document(page_content=doc) for i, doc in enumerate(docs)})
-    index_to_docstore_id = {i: i for i in range(len(docs))}
+    docstore = InMemoryDocstore({i: Document(page_content=doc) for i, doc in enumerate(documents)})
+    index_to_docstore_id = {i: i for i in range(len(documents))}
     
     # Initialize FAISS with the embedding function
     faiss_index = FAISS(
@@ -81,7 +82,7 @@ def parse_and_create_db(pdf_paths: list):
 
 def query_papers_combined(query: str, faiss_index, documents):
     # Perform a combined retrieval step for all documents
-    docs = faiss_index.similarity_search(query, k=5)
+    docs = faiss_index.similarity_search(query, k=len(documents))
     
     # Explicitly separate and label each document
     paper_contents = []
