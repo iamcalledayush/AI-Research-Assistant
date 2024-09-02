@@ -2,7 +2,6 @@ import os
 import requests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
-from langchain.chains.question_answering import load_qa_chain
 from PyPDF2 import PdfReader
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -17,7 +16,7 @@ GOOGLE_API_KEY = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
 # Initialize components
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Direct use of SentenceTransformer
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",  # Use Gemini 1.5 Flash model here
+    model="gemini-1.5-pro",  # Use Gemini 1.5 Pro model here
     api_key=GOOGLE_API_KEY,  # Pass the API key here
     temperature=0,
     max_tokens=None,
