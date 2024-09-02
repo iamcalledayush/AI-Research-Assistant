@@ -1,5 +1,4 @@
 import os
-import time
 import requests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
@@ -81,33 +80,23 @@ def parse_and_create_db(pdf_paths: list):
     
     return documents, faiss_index
 
-def query_papers_individually(query: str, faiss_index, documents, delay=1):
-    # Perform the retrieval step for each document individually
-    individual_responses = []
-    for i, doc in enumerate(documents):
-        docs = faiss_index.similarity_search(query, k=1)
-        
-        # Create a prompt specific to the current document
-        prompt = f"The following content is extracted from a research paper. Please explain the content of this specific paper:\n\n"
-        final_answer = llm.invoke(prompt + doc + "\n\nQuestion: " + query)
-        
-        individual_responses.append(f"Response for Paper {i+1}:\n{final_answer.content}\n")
-        
-        # Add a delay between LLM calls to avoid resource exhaustion
-        time.sleep(delay)
-    
-    return "\n".join(individual_responses)
-
 def query_papers_combined(query: str, faiss_index, documents):
     # Perform a combined retrieval step for all documents
     docs = faiss_index.similarity_search(query, k=5)
     
+    # Explicitly separate and label each document
+    paper_contents = []
+    for i, doc in enumerate(docs):
+        paper_contents.append(f"Paper {i+1}:\n{doc.page_content}\n")
+    
+    # Combine all papers into a single prompt
+    combined_docs = "\n\n".join(paper_contents)
+    
     # Create a prompt that instructs the LLM to consider all documents
-    prompt = f"The following content is extracted from multiple research papers. Please consider all the papers and provide a comprehensive response based on all of them:\n\n"
-    combined_docs = "\n\n".join([doc.page_content for doc in docs])
+    prompt = f"The following content is extracted from multiple research papers. Each paper is separated and labeled. Please consider all the papers and provide a comprehensive response based on all of them:\n\n"
     final_answer = llm.invoke(prompt + combined_docs + "\n\nQuestion: " + query)
     
-    return f"Combined Response:\n{final_answer.content}"
+    return final_answer.content
 
 # Streamlit interface
 st.title("ArXiv Paper Query Assistant")
@@ -136,16 +125,10 @@ if st.button("Get Response"):
             if pdf_paths:
                 documents, faiss_index = parse_and_create_db(pdf_paths)
                 
-                # Perform LLM calls for each paper individually
-                individual_responses = query_papers_individually(query, faiss_index, documents, delay=2)
-                
                 # Perform a combined LLM call for all papers together
                 combined_response = query_papers_combined(query, faiss_index, documents)
                 
                 # Display the results
-                st.write("**Individual Paper Responses:**")
-                st.write(individual_responses)
-                
                 st.write("**Combined Papers Response:**")
                 st.write(combined_response)
             else:
