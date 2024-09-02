@@ -63,16 +63,16 @@ def parse_and_create_db(pdf_paths: list):
                 text += page.extract_text()
         
         docs = text_splitter.split_text(text)
-        documents.extend(docs)
+        documents.extend([Document(page_content=doc) for doc in docs])
     
     # Create FAISS index
-    embeddings = embedding_model.encode(documents)  # Using SentenceTransformer directly
+    embeddings = embedding_model.encode([doc.page_content for doc in documents])  # Use the page_content
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
 
     # Map documents to the FAISS index
-    docstore = InMemoryDocstore({i: Document(page_content=doc) for i, doc in enumerate(documents)})
+    docstore = InMemoryDocstore({i: doc for i, doc in enumerate(documents)})
     index_to_docstore_id = {i: i for i in range(len(documents))}
     
     # Initialize FAISS with the embedding function
@@ -92,9 +92,12 @@ def summarize_paper(paper_content):
         f"{paper_content}"
     )
     
-    summary = summary_llm.invoke(prompt)
-    
-    return summary.content
+    try:
+        summary = summary_llm.invoke(prompt)
+        return summary.content
+    except Exception as e:
+        st.error(f"Error summarizing paper: {str(e)}")
+        return None
 
 def query_papers_combined(query: str, summaries: list):
     # Combine all summaries into a single prompt with clear separation
@@ -110,10 +113,12 @@ def query_papers_combined(query: str, summaries: list):
         + query
     )
     
-    # Make a single LLM call with the combined summaries
-    final_answer = final_response_llm.invoke(prompt)
-    
-    return final_answer.content
+    try:
+        final_answer = final_response_llm.invoke(prompt)
+        return final_answer.content
+    except Exception as e:
+        st.error(f"Error generating final response: {str(e)}")
+        return None
 
 # Streamlit interface
 st.title("ArXiv Paper Query Assistant")
@@ -146,14 +151,21 @@ if st.button("Get Response"):
                 summaries = []
                 for doc in documents:
                     summary = summarize_paper(doc.page_content)
-                    summaries.append(summary)
+                    if summary:
+                        summaries.append(summary)
                 
-                # Perform a combined LLM call using the final response API key
-                combined_response = query_papers_combined(query, summaries)
-                
-                # Display the results
-                st.write("**Combined Papers Response:**")
-                st.write(combined_response)
+                if summaries:
+                    # Perform a combined LLM call using the final response API key
+                    combined_response = query_papers_combined(query, summaries)
+                    
+                    # Display the results
+                    if combined_response:
+                        st.write("**Combined Papers Response:**")
+                        st.write(combined_response)
+                    else:
+                        st.error("Failed to generate a combined response.")
+                else:
+                    st.error("Failed to generate summaries for the papers.")
             else:
                 st.error("No valid PDFs found.")
     else:
