@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
@@ -80,17 +81,20 @@ def parse_and_create_db(pdf_paths: list):
     
     return documents, faiss_index
 
-def query_papers_individually(query: str, faiss_index, documents):
+def query_papers_individually(query: str, faiss_index, documents, delay=1):
     # Perform the retrieval step for each document individually
     individual_responses = []
     for i, doc in enumerate(documents):
-        docs = faiss_index.similarity_search(query, k=5)
+        docs = faiss_index.similarity_search(query, k=1)
         
         # Create a prompt specific to the current document
         prompt = f"The following content is extracted from a research paper. Please explain the content of this specific paper:\n\n"
         final_answer = llm.invoke(prompt + doc + "\n\nQuestion: " + query)
         
         individual_responses.append(f"Response for Paper {i+1}:\n{final_answer.content}\n")
+        
+        # Add a delay between LLM calls to avoid resource exhaustion
+        time.sleep(delay)
     
     return "\n".join(individual_responses)
 
@@ -133,7 +137,7 @@ if st.button("Get Response"):
                 documents, faiss_index = parse_and_create_db(pdf_paths)
                 
                 # Perform LLM calls for each paper individually
-                individual_responses = query_papers_individually(query, faiss_index, documents)
+                individual_responses = query_papers_individually(query, faiss_index, documents, delay=2)
                 
                 # Perform a combined LLM call for all papers together
                 combined_response = query_papers_combined(query, faiss_index, documents)
