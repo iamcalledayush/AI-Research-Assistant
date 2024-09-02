@@ -26,7 +26,6 @@ llm = ChatGoogleGenerativeAI(
 
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 
-# Agent 1: Document Parsing
 def download_and_parse_papers(arxiv_urls):
     parsed_papers = []
     for url in arxiv_urls:
@@ -49,20 +48,16 @@ def extract_text_from_pdf(pdf_content):
         text += page.extract_text()
     return text
 
-# Agent 2: Summarization
-def summarize_paper(paper_text):
+def summarize_combined_papers(parsed_papers, query):
+    combined_papers = "\n\n".join([f"Paper {i+1}:\n{paper}" for i, paper in enumerate(parsed_papers)])
     prompt = (
-        "The following is the content of a research paper. "
-        "Please summarize the content without referencing or explaining any related papers:\n\n"
-        + paper_text
+        "The following are multiple research papers. Each paper is clearly separated. "
+        "Please summarize each paper individually without referencing or explaining any related papers:\n\n"
+        + combined_papers
+        + f"\n\nQuestion: {query}"
     )
     summary = llm.invoke(prompt)
     return summary.content
-
-# Agent 3: Response Integration
-def integrate_responses(summaries):
-    integrated_response = "\n\n".join(f"Paper {i+1} Summary:\n{summary}" for i, summary in enumerate(summaries))
-    return integrated_response
 
 # Streamlit interface
 st.title("ArXiv Paper Query Assistant")
@@ -83,14 +78,14 @@ if st.button("Get Response"):
             # Agent 1: Parse papers
             parsed_papers = download_and_parse_papers(arxiv_links)
             
-            # Agent 2: Summarize papers
-            summaries = [summarize_paper(paper) for paper in parsed_papers]
-            
-            # Agent 3: Integrate responses
-            final_response = integrate_responses(summaries)
-            
-            # Display the results
-            st.write("**Combined Papers Response:**")
-            st.write(final_response)
+            if parsed_papers:
+                # Agent 2: Summarize combined papers
+                final_response = summarize_combined_papers(parsed_papers, query)
+                
+                # Display the results
+                st.write("**Combined Papers Response:**")
+                st.write(final_response)
+            else:
+                st.error("No valid PDFs found.")
     else:
         st.warning("Please enter arXiv links and a query.")
