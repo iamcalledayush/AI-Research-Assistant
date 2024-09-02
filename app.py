@@ -84,33 +84,13 @@ def query_papers(query: str, faiss_index, documents):
     # Perform the retrieval step
     docs = faiss_index.similarity_search(query, k=5)
     
-    # Load the QA chain
-    chain = load_qa_chain(llm=llm, chain_type="refine")
+    # Use the 'map_reduce' method for better handling of multiple documents
+    chain = load_qa_chain(llm=llm, chain_type="map_reduce")
     
     # Run the chain on the retrieved documents
-    initial_answer = chain.run(input_documents=docs, question=query)
-    
-    # Refine the initial answer by asking the LLM to focus on the required response
-    prompt = f"The following content is extracted from a research paper. Please process it accordingly:\n\n{initial_answer}\n\nNow, provide only the relevant information in response to the query."
-    refined_response = llm.invoke(prompt)
-    
-    # Extract the text content from the refined response
-    final_answer = refined_response.content
+    final_answer = chain.run(input_documents=docs, question=query)
     
     return final_answer
-
-def related_papers(query: str, faiss_index, documents):
-    # Perform the retrieval step
-    docs = faiss_index.similarity_search(query, k=5)
-    
-    # Extract titles or relevant parts of the documents to display
-    related_titles = []
-    for doc in docs:
-        # Attempt to extract a title from the document
-        first_line = doc.page_content.split('\n', 1)[0]
-        related_titles.append(first_line)
-    
-    return related_titles
 
 # Streamlit interface
 st.title("ArXiv Paper Query Assistant")
@@ -138,14 +118,9 @@ if st.button("Get Response"):
         if pdf_paths:
             documents, faiss_index = parse_and_create_db(pdf_paths)
             response = query_papers(query, faiss_index, documents)
-            related_titles = related_papers(query, faiss_index, documents)
             
             st.write("**Response:**")
             st.write(response)
-            
-            st.write("**Related Papers:**")
-            for title in related_titles:
-                st.write(title)
         else:
             st.error("No valid PDFs found.")
     else:
