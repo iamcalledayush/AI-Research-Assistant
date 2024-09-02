@@ -85,8 +85,11 @@ def query_papers_separately(query: str, faiss_index, documents):
     results = []
     
     for i, doc in enumerate(documents):
+        # Extract the actual text content from the document object
+        content = doc if isinstance(doc, str) else doc.page_content
+        
         # Create a specific prompt for each document
-        paper_prompt = f"Paper {i+1} Content:\n{doc.page_content}\n\nPlease focus only on explaining this paper's content and do not mention or explain any related papers that might be cited or referenced within it."
+        paper_prompt = f"Paper {i+1} Content:\n{content}\n\nPlease focus only on explaining this paper's content and do not mention or explain any related papers that might be cited or referenced within it."
         
         # Invoke the LLM for this specific paper
         result = llm.invoke(f"{paper_prompt}\n\nQuestion: {query}")
