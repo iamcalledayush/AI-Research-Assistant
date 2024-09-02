@@ -80,17 +80,30 @@ def parse_and_create_db(pdf_paths: list):
     
     return documents, faiss_index
 
-def query_papers(query: str, faiss_index, documents):
-    # Perform the retrieval step
+def query_papers_individually(query: str, faiss_index, documents):
+    # Perform the retrieval step for each document individually
+    individual_responses = []
+    for i, doc in enumerate(documents):
+        docs = faiss_index.similarity_search(query, k=5)
+        
+        # Create a prompt specific to the current document
+        prompt = f"The following content is extracted from a research paper. Please explain the content of this specific paper:\n\n"
+        final_answer = llm.invoke(prompt + doc + "\n\nQuestion: " + query)
+        
+        individual_responses.append(f"Response for Paper {i+1}:\n{final_answer.content}\n")
+    
+    return "\n".join(individual_responses)
+
+def query_papers_combined(query: str, faiss_index, documents):
+    # Perform a combined retrieval step for all documents
     docs = faiss_index.similarity_search(query, k=5)
     
-    # Use the 'map_reduce' method for better handling of multiple documents
-    chain = load_qa_chain(llm=llm, chain_type="map_reduce")
+    # Create a prompt that instructs the LLM to consider all documents
+    prompt = f"The following content is extracted from multiple research papers. Please consider all the papers and provide a comprehensive response based on all of them:\n\n"
+    combined_docs = "\n\n".join([doc.page_content for doc in docs])
+    final_answer = llm.invoke(prompt + combined_docs + "\n\nQuestion: " + query)
     
-    # Combine the outputs from each document
-    final_answer = chain.run(input_documents=docs, question=query)
-    
-    return final_answer
+    return f"Combined Response:\n{final_answer.content}"
 
 # Streamlit interface
 st.title("ArXiv Paper Query Assistant")
@@ -118,10 +131,19 @@ if st.button("Get Response"):
             
             if pdf_paths:
                 documents, faiss_index = parse_and_create_db(pdf_paths)
-                response = query_papers(query, faiss_index, documents)
                 
-                st.write("**Response:**")
-                st.write(response)
+                # Perform LLM calls for each paper individually
+                individual_responses = query_papers_individually(query, faiss_index, documents)
+                
+                # Perform a combined LLM call for all papers together
+                combined_response = query_papers_combined(query, faiss_index, documents)
+                
+                # Display the results
+                st.write("**Individual Paper Responses:**")
+                st.write(individual_responses)
+                
+                st.write("**Combined Papers Response:**")
+                st.write(combined_response)
             else:
                 st.error("No valid PDFs found.")
     else:
