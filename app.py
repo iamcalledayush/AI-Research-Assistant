@@ -92,8 +92,8 @@ def query_papers_combined(query: str, faiss_index, documents):
     # Combine all papers into a single prompt
     combined_docs = "\n\n".join(paper_contents)
     
-    # Create a prompt that instructs the LLM to consider all documents
-    prompt = f"The following content is extracted from multiple research papers. Each paper is separated and labeled. Please consider all the papers and provide a comprehensive response based on all of them:\n\n"
+    # Create a prompt that instructs the LLM to focus only on the given papers' content
+    prompt = f"The following content is extracted from multiple research papers. Each paper is separated and labeled. Please focus solely on explaining the content of the given papers, and do not include any discussion or explanation of related papers that might be mentioned within them:\n\n"
     final_answer = llm.invoke(prompt + combined_docs + "\n\nQuestion: " + query)
     
     return final_answer.content
