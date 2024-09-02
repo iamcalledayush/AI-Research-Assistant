@@ -48,7 +48,6 @@ def download_arxiv_pdf(arxiv_url: str, download_dir: str = "./pdfs/") -> str:
 
 def parse_and_create_db(pdf_paths: list):
     documents = []
-    ids = []
     
     for pdf_path in pdf_paths:
         with open(pdf_path, "rb") as f:
@@ -80,33 +79,29 @@ def parse_and_create_db(pdf_paths: list):
     
     return documents, faiss_index
 
-def query_papers_combined(query: str, faiss_index, documents):
-    # Perform a combined retrieval step for all documents
-    docs = faiss_index.similarity_search(query, k=len(documents))
+def query_papers_chunked(query: str, faiss_index, documents, chunk_size=2):
+    # Break documents into smaller chunks and send them to LLM one by one
+    chunks = [documents[i:i + chunk_size] for i in range(0, len(documents), chunk_size)]
+    combined_response = ""
     
-    # Explicitly separate and label each document
-    paper_contents = []
-    for i, doc in enumerate(docs):
-        content = doc.page_content if isinstance(doc, Document) else doc
-        paper_contents.append(f"Paper {i+1} Content:\n{content}\n")
+    for chunk in chunks:
+        chunk_docs = "\n\n".join([f"Paper {i+1} Content:\n{doc.page_content}" for i, doc in enumerate(chunk)])
+        prompt = (
+            "The following content is extracted from multiple research papers. "
+            "Each paper is separated and labeled. Please focus solely on explaining the content of the given papers, "
+            "and do not include any discussion or explanation of related papers that might be mentioned within them:\n\n"
+            + chunk_docs
+            + "\n\nQuestion: "
+            + query
+        )
+        try:
+            response = llm.invoke(prompt)
+            combined_response += response.content + "\n\n"
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+            break
     
-    # Combine all papers into a single prompt with clear separation
-    combined_docs = "\n\n".join(paper_contents)
-    
-    # Create a prompt that instructs the LLM to focus only on the given papers' content
-    prompt = (
-        "The following content is extracted from multiple research papers. "
-        "Each paper is separated and labeled. Please focus solely on explaining the content of the given papers, "
-        "and do not include any discussion or explanation of related papers that might be mentioned within them:\n\n"
-        + combined_docs
-        + "\n\nQuestion: "
-        + query
-    )
-    
-    # Make a single LLM call with the combined prompt
-    final_answer = llm.invoke(prompt)
-    
-    return final_answer.content
+    return combined_response
 
 # Streamlit interface
 st.title("ArXiv Paper Query Assistant")
@@ -135,8 +130,8 @@ if st.button("Get Response"):
             if pdf_paths:
                 documents, faiss_index = parse_and_create_db(pdf_paths)
                 
-                # Perform a combined LLM call for all papers together
-                combined_response = query_papers_combined(query, faiss_index, documents)
+                # Perform a chunked LLM call for all papers
+                combined_response = query_papers_chunked(query, faiss_index, documents)
                 
                 # Display the results
                 st.write("**Combined Papers Response:**")
