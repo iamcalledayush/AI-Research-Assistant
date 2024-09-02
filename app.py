@@ -57,16 +57,16 @@ def parse_and_create_db(pdf_paths: list):
                 text += page.extract_text()
         
         docs = text_splitter.split_text(text)
-        documents.extend(docs)
+        documents.extend([Document(page_content=doc) for doc in docs])
     
     # Create FAISS index
-    embeddings = embedding_model.encode(documents)  # Using SentenceTransformer directly
+    embeddings = embedding_model.encode([doc.page_content for doc in documents])  # Using SentenceTransformer directly
     dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
 
     # Map documents to the FAISS index
-    docstore = InMemoryDocstore({i: Document(page_content=doc) for i, doc in enumerate(documents)})
+    docstore = InMemoryDocstore({i: doc for i, doc in enumerate(documents)})
     index_to_docstore_id = {i: i for i in range(len(documents))}
     
     # Initialize FAISS with the embedding function
