@@ -66,8 +66,8 @@ def parse_and_create_db(pdf_paths: list):
     index.add(embeddings)
 
     # Map documents to the FAISS index
-    docstore = InMemoryDocstore({i: Document(page_content=doc) for i, doc in enumerate(documents)})
-    index_to_docstore_id = {i: i for i in range(len(documents))}
+    docstore = InMemoryDocstore({i: Document(page_content=doc) for i, doc in enumerate(docs)})
+    index_to_docstore_id = {i: i for i in range(len(docs))}
     
     # Initialize FAISS with the embedding function
     faiss_index = FAISS(
