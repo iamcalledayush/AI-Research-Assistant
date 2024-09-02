@@ -79,25 +79,24 @@ def parse_and_create_db(pdf_paths: list):
     
     return documents, faiss_index
 
-def query_papers_combined(query: str, faiss_index, documents):
-    # Perform a combined retrieval step for all documents
-    docs = faiss_index.similarity_search(query, k=5)
-    
-    # Explicitly separate and label each document
-    paper_contents = []
-    for i, doc in enumerate(docs):
-        content = doc.page_content if isinstance(doc, Document) else doc
-        paper_contents.append(f"Paper {i+1} Content:\n{content}\n")
-    
-    # Combine all papers into a single prompt with clear separation
-    combined_docs = "\n\n".join(paper_contents)
-    
-    # Create a prompt that instructs the LLM to focus only on the given papers' content
+def summarize_paper(paper_content: str):
     prompt = (
-        "The following content is extracted from multiple research papers. "
-        "Each paper is separated and labeled. Please focus solely on explaining the content of the given papers, "
-        "and do not include any discussion or explanation of related papers that might be mentioned within them:\n\n"
-        + combined_docs
+        "Please provide a medium-length summary that includes all important points from this paper "
+        "and avoids mentioning any related papers:\n\n"
+        + paper_content
+    )
+    summary = llm.invoke(prompt)
+    return summary.content
+
+def query_papers_combined(query: str, summaries: list):
+    # Combine all summaries into a single prompt with clear labeling
+    combined_summaries = "\n\n".join([f"Paper {i+1} Summary:\n{summary}" for i, summary in enumerate(summaries)])
+    
+    # Create a prompt that instructs the LLM to focus only on the summaries provided
+    prompt = (
+        "The following summaries are extracted from multiple research papers. "
+        "Each summary is separated and labeled. Please focus solely on answering the question based on the given summaries:\n\n"
+        + combined_summaries
         + "\n\nQuestion: "
         + query
     )
@@ -134,8 +133,14 @@ if st.button("Get Response"):
             if pdf_paths:
                 documents, faiss_index = parse_and_create_db(pdf_paths)
                 
-                # Perform a combined LLM call for all papers together
-                combined_response = query_papers_combined(query, faiss_index, documents)
+                # Generate summaries for each paper
+                summaries = []
+                for i, doc in enumerate(documents):
+                    summary = summarize_paper(doc.page_content)
+                    summaries.append(summary)
+                
+                # Perform a combined LLM call with all summaries
+                combined_response = query_papers_combined(query, summaries)
                 
                 # Display the results
                 st.write("**Combined Papers Response:**")
