@@ -63,6 +63,12 @@ puzzle_chain = LLMChain(
 # Streamlit interface for the game
 st.title("Interactive Fiction Game with Dynamic Storylines")
 
+# Initialize session state variables to maintain game flow
+if "story_output" not in st.session_state:
+    st.session_state.story_output = ""
+if "puzzle_triggered" not in st.session_state:
+    st.session_state.puzzle_triggered = False
+
 st.write("### Welcome to your personalized adventure! 🎮")
 st.write("Your journey will adapt to the choices you make, and you may encounter puzzles along the way.")
 
@@ -76,29 +82,34 @@ skills = st.text_input("Enter the skills your character possesses (e.g., swordsm
 if st.button("Start Your Adventure"):
     with st.spinner("Weaving your story..."):
         # Generate the first part of the story
-        story_output = story_chain.run({
+        st.session_state.story_output = story_chain.run({
             "setting": setting,
             "conflict": conflict,
             "goal": goal,
             "skills": skills
         })
-        
-        st.write("### Your Story Begins:")
-        st.write(story_output)
-        
-        # Simulate the appearance of a puzzle
-        puzzle_trigger = st.checkbox("Encounter a Puzzle")
-        
-        if puzzle_trigger:
-            puzzle_type = st.selectbox("Choose a type of puzzle:", ["riddle", "logic puzzle", "pattern recognition challenge"])
-            puzzle_description = st.text_input(f"Describe the {puzzle_type} you want to encounter:", f"A riddle of ancient lore that must be solved to unlock the secret passage.")
-            
-            if st.button("Solve the Puzzle"):
-                with st.spinner("Generating your puzzle..."):
-                    # Generate the puzzle dynamically based on the user's choice
-                    puzzle_output = puzzle_chain.run({
-                        "puzzle_type": puzzle_type,
-                        "puzzle_description": puzzle_description
-                    })
-                    st.write("### A Puzzle Appears:")
-                    st.write(puzzle_output)
+        st.session_state.puzzle_triggered = False  # Reset puzzle state when starting a new story
+
+# Display the story output
+if st.session_state.story_output:
+    st.write("### Your Story Begins:")
+    st.write(st.session_state.story_output)
+
+# Simulate the appearance of a puzzle
+if st.checkbox("Encounter a Puzzle"):
+    st.session_state.puzzle_triggered = True
+
+# Puzzle logic
+if st.session_state.puzzle_triggered:
+    puzzle_type = st.selectbox("Choose a type of puzzle:", ["riddle", "logic puzzle", "pattern recognition challenge"])
+    puzzle_description = st.text_input(f"Describe the {puzzle_type} you want to encounter:", f"A riddle of ancient lore that must be solved to unlock the secret passage.")
+    
+    if st.button("Solve the Puzzle"):
+        with st.spinner("Generating your puzzle..."):
+            # Generate the puzzle dynamically based on the user's choice
+            puzzle_output = puzzle_chain.run({
+                "puzzle_type": puzzle_type,
+                "puzzle_description": puzzle_description
+            })
+            st.write("### A Puzzle Appears:")
+            st.write(puzzle_output)
