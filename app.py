@@ -1,20 +1,35 @@
+import os
 import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+import time
 
-# Set up Google API Key
-GOOGLE_API_KEY = "AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU"
+# Set up two Google API Keys for load balancing
+API_KEY_1 = "AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU"
+API_KEY_2 = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
+
+# Function to switch between API keys for load balancing
+def get_api_key():
+    if "api_key_usage" not in st.session_state:
+        st.session_state.api_key_usage = 0
+    # Switch between API keys
+    st.session_state.api_key_usage += 1
+    if st.session_state.api_key_usage % 2 == 0:
+        return API_KEY_1
+    else:
+        return API_KEY_2
 
 # Initialize the Gemini 1.5 Pro model
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-pro",
-    api_key=GOOGLE_API_KEY,
-    temperature=0.8,  # Adjust temperature for more creative responses
-    max_tokens=512,  # Adjust max tokens as needed
-    timeout=None,
-    max_retries=2,
-)
+def init_llm(api_key):
+    return ChatGoogleGenerativeAI(
+        model="gemini-1.5-pro",
+        api_key=api_key,
+        temperature=0.8,  # Adjust temperature for creative responses
+        max_tokens=300,  # Adjust max tokens to reduce the load
+        timeout=15,  # Timeout after 15 seconds
+        max_retries=3,  # Retry up to 3 times in case of errors
+    )
 
 # Define the game’s story templates and logic
 story_template = """
@@ -37,28 +52,23 @@ The puzzle is: {puzzle_description}
 Hint: Think about the clues you've encountered so far.
 """
 
-# Define the PromptTemplate for dynamically generating the story
+# Define PromptTemplates for dynamically generating the story and puzzles
 story_prompt = PromptTemplate(
     input_variables=["setting", "conflict", "goal", "skills"],
     template=story_template
 )
 
-# Define the PromptTemplate for generating dynamic puzzles
 puzzle_prompt = PromptTemplate(
     input_variables=["puzzle_type", "puzzle_description"],
     template=puzzle_template
 )
 
-# Create LLMChains for the story and puzzles
-story_chain = LLMChain(
-    llm=llm,
-    prompt=story_prompt
-)
-
-puzzle_chain = LLMChain(
-    llm=llm,
-    prompt=puzzle_prompt
-)
+# Create LLMChain for the story and puzzles
+def create_llm_chain(llm, prompt):
+    return LLMChain(
+        llm=llm,
+        prompt=prompt
+    )
 
 # Streamlit interface for the game
 st.title("Interactive Fiction Game with Dynamic Storylines")
@@ -81,6 +91,8 @@ skills = st.text_input("Enter the skills your character possesses (e.g., swordsm
 # Button to start the game
 if st.button("Start Your Adventure"):
     with st.spinner("Weaving your story..."):
+        llm = init_llm(get_api_key())  # Use the API key based on current load
+        story_chain = create_llm_chain(llm, story_prompt)
         # Generate the first part of the story
         st.session_state.story_output = story_chain.run({
             "setting": setting,
@@ -106,10 +118,15 @@ if st.session_state.puzzle_triggered:
     
     if st.button("Solve the Puzzle"):
         with st.spinner("Generating your puzzle..."):
+            llm = init_llm(get_api_key())  # Use another API key for puzzle generation
+            puzzle_chain = create_llm_chain(llm, puzzle_prompt)
             # Generate the puzzle dynamically based on the user's choice
-            puzzle_output = puzzle_chain.run({
-                "puzzle_type": puzzle_type,
-                "puzzle_description": puzzle_description
-            })
-            st.write("### A Puzzle Appears:")
-            st.write(puzzle_output)
+            try:
+                puzzle_output = puzzle_chain.run({
+                    "puzzle_type": puzzle_type,
+                    "puzzle_description": puzzle_description
+                })
+                st.write("### A Puzzle Appears:")
+                st.write(puzzle_output)
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}. Please try again.")
