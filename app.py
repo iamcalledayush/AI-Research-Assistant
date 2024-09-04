@@ -3,22 +3,9 @@ import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-import time
 
-# Set up two Google API Keys for load balancing
-API_KEY_1 = "AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU"
-API_KEY_2 = "AIzaSyCSOt-RM3M-SsEQObh5ZBe-XwDK36oD3lM"
-
-# Function to switch between API keys for load balancing
-def get_api_key():
-    if "api_key_usage" not in st.session_state:
-        st.session_state.api_key_usage = 0
-    # Switch between API keys
-    st.session_state.api_key_usage += 1
-    if st.session_state.api_key_usage % 2 == 0:
-        return API_KEY_1
-    else:
-        return API_KEY_2
+# Set up Google API Key directly in the code
+GOOGLE_API_KEY = "AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU"
 
 # Initialize the Gemini 1.5 Pro model
 def init_llm(api_key):
@@ -26,9 +13,9 @@ def init_llm(api_key):
         model="gemini-1.5-pro",
         api_key=api_key,
         temperature=0.8,  # Adjust temperature for creative responses
-        max_tokens=300,  # Adjust max tokens to reduce the load
-        timeout=15,  # Timeout after 15 seconds
-        max_retries=3,  # Retry up to 3 times in case of errors
+        max_tokens=300,    # Adjust max tokens for better performance
+        timeout=15,        # Timeout after 15 seconds
+        max_retries=3      # Retry up to 3 times in case of errors
     )
 
 # Define the game’s story templates and logic
@@ -45,25 +32,13 @@ Goal: {goal}
 What would you like to do first?
 """
 
-puzzle_template = """
-A puzzle presents itself in the form of {puzzle_type}. Solve this to move forward in your journey.
-The puzzle is: {puzzle_description}
-
-Hint: Think about the clues you've encountered so far.
-"""
-
-# Define PromptTemplates for dynamically generating the story and puzzles
+# Define PromptTemplates for dynamically generating the story
 story_prompt = PromptTemplate(
     input_variables=["setting", "conflict", "goal", "skills"],
     template=story_template
 )
 
-puzzle_prompt = PromptTemplate(
-    input_variables=["puzzle_type", "puzzle_description"],
-    template=puzzle_template
-)
-
-# Create LLMChain for the story and puzzles
+# Create LLMChain for the story
 def create_llm_chain(llm, prompt):
     return LLMChain(
         llm=llm,
@@ -76,11 +51,9 @@ st.title("Interactive Fiction Game with Dynamic Storylines")
 # Initialize session state variables to maintain game flow
 if "story_output" not in st.session_state:
     st.session_state.story_output = ""
-if "puzzle_triggered" not in st.session_state:
-    st.session_state.puzzle_triggered = False
 
 st.write("### Welcome to your personalized adventure! 🎮")
-st.write("Your journey will adapt to the choices you make, and you may encounter puzzles along the way.")
+st.write("Your journey will adapt to the choices you make, creating unique storylines along the way.")
 
 # Input fields for the player to create their own adventure elements
 setting = st.text_input("Enter the setting for your story (e.g., a mystical forest, a futuristic city):", "a mystical forest")
@@ -91,7 +64,7 @@ skills = st.text_input("Enter the skills your character possesses (e.g., swordsm
 # Button to start the game
 if st.button("Start Your Adventure"):
     with st.spinner("Weaving your story..."):
-        llm = init_llm(get_api_key())  # Use the API key based on current load
+        llm = init_llm(GOOGLE_API_KEY)  # Use the primary API key for the LLM
         story_chain = create_llm_chain(llm, story_prompt)
         # Generate the first part of the story
         st.session_state.story_output = story_chain.run({
@@ -100,33 +73,23 @@ if st.button("Start Your Adventure"):
             "goal": goal,
             "skills": skills
         })
-        st.session_state.puzzle_triggered = False  # Reset puzzle state when starting a new story
 
 # Display the story output
 if st.session_state.story_output:
     st.write("### Your Story Begins:")
     st.write(st.session_state.story_output)
 
-# Simulate the appearance of a puzzle
-if st.checkbox("Encounter a Puzzle"):
-    st.session_state.puzzle_triggered = True
-
-# Puzzle logic
-if st.session_state.puzzle_triggered:
-    puzzle_type = st.selectbox("Choose a type of puzzle:", ["riddle", "logic puzzle", "pattern recognition challenge"])
-    puzzle_description = st.text_input(f"Describe the {puzzle_type} you want to encounter:", f"A riddle of ancient lore that must be solved to unlock the secret passage.")
+    # Provide the player with a choice for what to do next
+    next_action = st.text_input("What would you like to do next in the story?")
     
-    if st.button("Solve the Puzzle"):
-        with st.spinner("Generating your puzzle..."):
-            llm = init_llm(get_api_key())  # Use another API key for puzzle generation
-            puzzle_chain = create_llm_chain(llm, puzzle_prompt)
-            # Generate the puzzle dynamically based on the user's choice
+    if st.button("Continue"):
+        with st.spinner("Continuing your journey..."):
+            # Update the story based on the player's next action
             try:
-                puzzle_output = puzzle_chain.run({
-                    "puzzle_type": puzzle_type,
-                    "puzzle_description": puzzle_description
-                })
-                st.write("### A Puzzle Appears:")
-                st.write(puzzle_output)
+                llm = init_llm(GOOGLE_API_KEY)  # Use the same API key for continuity
+                next_story_prompt = f"{st.session_state.story_output}\n\nPlayer's Action: {next_action}\nContinue the story based on this."
+                response = llm.invoke(next_story_prompt)
+                st.session_state.story_output += "\n\n" + response.content
+                st.write(st.session_state.story_output)
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}. Please try again.")
