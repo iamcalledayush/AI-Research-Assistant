@@ -9,13 +9,13 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
-
+# Set up Google API Key directly in the code
 GOOGLE_API_KEY = "AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU"
 
-# Initialize the Gemini 1.5 Pro model
+# Initialize the Gemini 1.5 Flash model
 def init_llm(api_key):
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-1.5-flash",  # Using Gemini 1.5 Flash as per request
         api_key=api_key,
         temperature=0.8,  # Adjust temperature for creative responses
         max_tokens=300,    # Adjust max tokens for better performance
@@ -40,26 +40,20 @@ def extract_text_from_file(file):
         return "\n".join([para.text for para in doc.paragraphs])
     return ""
 
-# Function to create a more detailed PowerPoint from text
-def create_ppt_from_text(text):
+# Function to create a PowerPoint file from AI-generated content
+def create_ppt_from_text(text, min_slides, max_slides):
     prs = Presentation()
     slide_layout = prs.slide_layouts[1]  # Use a layout with a title and content
 
-    # Split the text into sections
-    sections = text.split("\n\n")  # Assuming sections are separated by double newlines
-    section_limit = 5  # Limit sections per slide to avoid too much text on one slide
-
-    for i, section in enumerate(sections):
-        if i % section_limit == 0:  # Start a new slide every few sections
-            slide = prs.slides.add_slide(slide_layout)
-            title = slide.shapes.title
-            title.text = f"Slide {i // section_limit + 1}"
-
-        content = slide.shapes.placeholders[1]
-        content.text += "\n- " + section.strip()  # Add each section as a bullet point
+    # Use AI-generated content to create slides
+    slide = prs.slides.add_slide(slide_layout)
+    title = slide.shapes.title
+    title.text = f"Presentation Summary"
+    content = slide.shapes.placeholders[1]
+    content.text = text
 
     # Save PowerPoint
-    ppt_filename = "detailed_presentation.pptx"
+    ppt_filename = "generated_presentation.pptx"
     prs.save(ppt_filename)
     return ppt_filename
 
@@ -108,7 +102,17 @@ elif option == "Q&A Chatbot":
             st.write(response.content)
 
 elif option == "Create PPT from Text":
+    # Input min and max number of slides
+    min_slides = st.number_input("Enter the minimum number of slides", min_value=1, max_value=10, value=4)
+    max_slides = st.number_input("Enter the maximum number of slides", min_value=min_slides, max_value=20, value=6)
+    
     with st.spinner("Creating detailed PowerPoint..."):
-        ppt_file = create_ppt_from_text(document_text)
+        # Optimized prompt
+        ppt_prompt = f"Create a visually appealing PowerPoint presentation from the following document. The presentation should have between {min_slides} and {max_slides} slides: {document_text}"
+        response = llm.invoke(ppt_prompt)
+        
+        # Generate PowerPoint file using AI-generated content
+        ppt_file = create_ppt_from_text(response.content, min_slides, max_slides)
+        
         with open(ppt_file, "rb") as f:
-            st.download_button("Download PPT", f, file_name="detailed_presentation.pptx")
+            st.download_button("Download PPT", f, file_name="generated_presentation.pptx")
