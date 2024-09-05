@@ -103,8 +103,11 @@ elif option == "Q&A Chatbot":
 
 elif option == "Create PPT from Text":
     # Input min and max number of slides
+    # Input min and max number of slides
     min_slides = st.number_input("Enter the minimum number of slides", min_value=1, max_value=10, value=4)
-    max_slides = st.number_input("Enter the maximum number of slides", min_value=min_slides, max_value=20, value=6)
+
+    # Ensure that max_slides is not less than min_slides
+    max_slides = st.number_input("Enter the maximum number of slides", min_value=min_slides, max_value=20, value=max(6, min_slides))
     
     with st.spinner("Creating detailed PowerPoint..."):
         # Optimized prompt
