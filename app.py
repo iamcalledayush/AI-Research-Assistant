@@ -41,16 +41,19 @@ def extract_text_from_file(file):
     return ""
 
 # Function to create a PowerPoint file from AI-generated content
-def create_ppt_from_text(text, min_slides, max_slides):
+def create_ppt_from_text(text):
     prs = Presentation()
     slide_layout = prs.slide_layouts[1]  # Use a layout with a title and content
 
-    # Use AI-generated content to create slides
-    slide = prs.slides.add_slide(slide_layout)
-    title = slide.shapes.title
-    title.text = f"Presentation Summary"
-    content = slide.shapes.placeholders[1]
-    content.text = text
+    # Split the text into sections based on some logic
+    sections = text.split("\n\n")  # Basic splitting by paragraphs for now
+
+    for i, section in enumerate(sections):
+        slide = prs.slides.add_slide(slide_layout)
+        title = slide.shapes.title
+        title.text = f"Slide {i + 1}"
+        content = slide.shapes.placeholders[1]
+        content.text = section.strip()  # Add the section content
 
     # Save PowerPoint
     ppt_filename = "generated_presentation.pptx"
@@ -77,7 +80,7 @@ else:
 
 # Let the user choose the action
 option = st.selectbox("Choose what you want to do with the text:", 
-                      ["Create Summary", "Q&A Chatbot", "Create PPT from Text"])
+                      ["", "Create Summary", "Q&A Chatbot", "Create PPT from Text"])
 
 # Initialize LLM
 llm = init_llm(GOOGLE_API_KEY)
@@ -102,20 +105,21 @@ elif option == "Q&A Chatbot":
             st.write(response.content)
 
 elif option == "Create PPT from Text":
-    # Input min and max number of slides
-    # Input min and max number of slides
+    # Ask the user for the min and max slides once they select Create PPT
     min_slides = st.number_input("Enter the minimum number of slides", min_value=1, max_value=10, value=4)
+    max_slides = st.number_input("Enter the maximum number of slides", min_value=min_slides, max_value=20, value=6)
 
-    # Ensure that max_slides is not less than min_slides
-    max_slides = st.number_input("Enter the maximum number of slides", min_value=min_slides, max_value=20, value=max(6, min_slides))
-    
-    with st.spinner("Creating detailed PowerPoint..."):
-        # Optimized prompt
-        ppt_prompt = f"Create a visually appealing PowerPoint presentation from the following document. The presentation should have between {min_slides} and {max_slides} slides: {document_text}"
-        response = llm.invoke(ppt_prompt)
-        
-        # Generate PowerPoint file using AI-generated content
-        ppt_file = create_ppt_from_text(response.content, min_slides, max_slides)
-        
-        with open(ppt_file, "rb") as f:
-            st.download_button("Download PPT", f, file_name="generated_presentation.pptx")
+    if st.button("Create PPT"):
+        with st.spinner("Creating detailed PowerPoint..."):
+            # Optimized prompt for the model
+            ppt_prompt = (
+                f"Create a visually appealing PowerPoint presentation from the following document. "
+                f"The presentation should be between {min_slides} and {max_slides} slides long:\n\n{document_text}"
+            )
+            response = llm.invoke(ppt_prompt)
+            
+            # Generate PowerPoint file using AI-generated content
+            ppt_file = create_ppt_from_text(response.content)
+            
+            with open(ppt_file, "rb") as f:
+                st.download_button("Download PPT", f, file_name="generated_presentation.pptx")
