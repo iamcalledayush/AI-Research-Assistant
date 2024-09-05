@@ -113,8 +113,10 @@ elif option == "Create PPT from Text":
         with st.spinner("Creating detailed PowerPoint..."):
             # Optimized prompt for the model
             ppt_prompt = (
-                f"Create a visually appealing PowerPoint presentation from the following document. "
-                f"The presentation should be between {min_slides} and {max_slides} slides long:\n\n{document_text}"
+                f"Create a PowerPoint presentation from the following document. "
+                f"The presentation should summarize the key points, using concise bullet points. "
+                f"Ensure that each slide contains minimal text with clear headings and 4-6 bullet points per slide. "
+                f"The presentation should be between {min_slides} and {max_slides} slides in length:\n\n{document_text}"
             )
             response = llm.invoke(ppt_prompt)
             
