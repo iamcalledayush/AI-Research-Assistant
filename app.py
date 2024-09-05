@@ -15,7 +15,7 @@ GOOGLE_API_KEY = "AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU"
 # Initialize the Gemini 1.5 Pro model
 def init_llm(api_key):
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-pro",
+        model="gemini-1.5-flash",
         api_key=api_key,
         temperature=0.8,  # Adjust temperature for creative responses
         max_tokens=300,    # Adjust max tokens for better performance
