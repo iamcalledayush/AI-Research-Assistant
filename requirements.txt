@@ -5,4 +5,3 @@ PyPDF2
 langchain-google-genai
 python-pptx
 python-docx
-pyvis
