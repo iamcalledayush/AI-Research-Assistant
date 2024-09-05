@@ -3,8 +3,8 @@ import streamlit as st
 import PyPDF2
 import docx
 from io import StringIO
-from pptx import Presentation
-from pptx.util import Inches
+from pyvis.network import Network
+import streamlit.components.v1 as components
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -18,7 +18,7 @@ def init_llm(api_key):
         model="gemini-1.5-flash",  # Using Gemini 1.5 Flash as per request
         api_key=api_key,
         temperature=0.8,  # Adjust temperature for creative responses
-        max_tokens=300,    # Adjust max tokens for better performance
+        max_tokens=500,    # Adjust max tokens for better performance
         timeout=15,        # Timeout after 15 seconds
         max_retries=3      # Retry up to 3 times in case of errors
     )
@@ -40,28 +40,22 @@ def extract_text_from_file(file):
         return "\n".join([para.text for para in doc.paragraphs])
     return ""
 
-# Function to create a PowerPoint file from AI-generated content
-def create_ppt_from_text(text):
-    prs = Presentation()
-    slide_layout = prs.slide_layouts[1]  # Use a layout with a title and content
+# Function to generate knowledge graph from AI output
+def generate_knowledge_graph(concepts):
+    # Initialize the knowledge graph
+    net = Network(height="600px", width="100%", bgcolor="#222222", font_color="white")
 
-    # Split the text into sections based on some logic
-    sections = text.split("\n\n")  # Basic splitting by paragraphs for now
+    # Add nodes and edges from the concepts
+    for concept, related in concepts.items():
+        net.add_node(concept, label=concept)
+        for rel in related:
+            net.add_node(rel, label=rel)
+            net.add_edge(concept, rel)
 
-    for i, section in enumerate(sections):
-        slide = prs.slides.add_slide(slide_layout)
-        title = slide.shapes.title
-        title.text = f"Slide {i + 1}"
-        content = slide.shapes.placeholders[1]
-        content.text = section.strip()  # Add the section content
-
-    # Save PowerPoint
-    ppt_filename = "generated_presentation.pptx"
-    prs.save(ppt_filename)
-    return ppt_filename
+    return net
 
 # Streamlit interface
-st.title("Document Processing App")
+st.title("AI-Powered Knowledge Graph Generator")
 
 # File upload or manual text input
 uploaded_file = st.file_uploader("Upload a PDF or text file", type=["pdf", "txt", "docx"])
@@ -78,50 +72,35 @@ else:
     st.write("Please upload a file or enter text manually.")
     st.stop()
 
-# Let the user choose the action
-option = st.selectbox("Choose what you want to do with the text:", 
-                      ["", "Create Summary", "Q&A Chatbot", "Create PPT from Text"])
-
 # Initialize LLM
 llm = init_llm(GOOGLE_API_KEY)
 
-# Handle the user's choice
-if option == "Create Summary":
-    with st.spinner("Generating summary..."):
-        summary_prompt = f"Summarize the following text: {document_text}"
-        response = llm.invoke(summary_prompt)
-        st.write("### Summary:")
-        st.write(response.content)
+# Option to create knowledge graph
+if st.button("Generate Knowledge Graph"):
+    with st.spinner("Extracting key concepts and relationships..."):
+        # Generate the AI prompt for extracting key concepts
+        prompt = (
+            f"Extract the key concepts and their relationships from the following document. "
+            f"Provide the concepts in a format suitable for building a knowledge graph. "
+            f"Here is the document:\n\n{document_text}"
+        )
+        
+        # Invoke the AI model
+        response = llm.invoke(prompt)
 
-elif option == "Q&A Chatbot":
-    st.write("Ask questions about the document.")
-    question = st.text_input("Enter your question:")
-    
-    if st.button("Ask"):
-        with st.spinner("Fetching answer..."):
-            qa_prompt = f"Based on this document: {document_text}\nAnswer the question: {question}"
-            response = llm.invoke(qa_prompt)
-            st.write("### Answer:")
-            st.write(response.content)
+        # Parse the AI's response (assuming it returns a JSON-like structure with key concepts)
+        # Example format: {"Concept1": ["RelatedConcept1", "RelatedConcept2"], "Concept2": ["RelatedConcept3"]}
+        try:
+            concepts = eval(response.content)
+        except:
+            st.error("Error parsing the AI response. Please try again.")
+            st.stop()
 
-elif option == "Create PPT from Text":
-    # Ask the user for the min and max slides once they select Create PPT
-    min_slides = st.number_input("Enter the minimum number of slides", min_value=1, max_value=10, value=4)
-    max_slides = st.number_input("Enter the maximum number of slides", min_value=min_slides, max_value=20, value=6)
+        # Generate and display the knowledge graph
+        net = generate_knowledge_graph(concepts)
+        net.show("knowledge_graph.html")
 
-    if st.button("Create PPT"):
-        with st.spinner("Creating detailed PowerPoint..."):
-            # Optimized prompt for the model
-            ppt_prompt = (
-                f"Create a PowerPoint presentation from the following document. "
-                f"The presentation should summarize the key points, using concise bullet points. "
-                f"Ensure that each slide contains minimal text with clear headings and 4-6 bullet points per slide. "
-                f"The presentation should be between {min_slides} and {max_slides} slides in length:\n\n{document_text}"
-            )
-            response = llm.invoke(ppt_prompt)
-            
-            # Generate PowerPoint file using AI-generated content
-            ppt_file = create_ppt_from_text(response.content)
-            
-            with open(ppt_file, "rb") as f:
-                st.download_button("Download PPT", f, file_name="generated_presentation.pptx")
+        # Embed the graph in the Streamlit app
+        with open("knowledge_graph.html", "r", encoding="utf-8") as f:
+            graph_html = f.read()
+            components.html(graph_html, height=600)
