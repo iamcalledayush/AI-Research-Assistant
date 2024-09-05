@@ -4,6 +4,7 @@ import PyPDF2
 import docx
 from io import StringIO
 from pptx import Presentation
+from pptx.util import Inches
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -39,20 +40,27 @@ def extract_text_from_file(file):
         return "\n".join([para.text for para in doc.paragraphs])
     return ""
 
-# Function to create a PowerPoint file from text
+# Function to create a more detailed PowerPoint from text
 def create_ppt_from_text(text):
     prs = Presentation()
-    slide_layout = prs.slide_layouts[1]
-    slide = prs.slides.add_slide(slide_layout)
-    title = slide.shapes.title
-    content = slide.shapes.placeholders[1]
-    
-    title.text = "Summary of Document"
-    content.text = text
-    
-    ppt_filename = "summary_presentation.pptx"
+    slide_layout = prs.slide_layouts[1]  # Use a layout with a title and content
+
+    # Split the text into sections
+    sections = text.split("\n\n")  # Assuming sections are separated by double newlines
+    section_limit = 5  # Limit sections per slide to avoid too much text on one slide
+
+    for i, section in enumerate(sections):
+        if i % section_limit == 0:  # Start a new slide every few sections
+            slide = prs.slides.add_slide(slide_layout)
+            title = slide.shapes.title
+            title.text = f"Slide {i // section_limit + 1}"
+
+        content = slide.shapes.placeholders[1]
+        content.text += "\n- " + section.strip()  # Add each section as a bullet point
+
+    # Save PowerPoint
+    ppt_filename = "detailed_presentation.pptx"
     prs.save(ppt_filename)
-    
     return ppt_filename
 
 # Streamlit interface
@@ -100,7 +108,7 @@ elif option == "Q&A Chatbot":
             st.write(response.content)
 
 elif option == "Create PPT from Text":
-    with st.spinner("Creating PowerPoint..."):
+    with st.spinner("Creating detailed PowerPoint..."):
         ppt_file = create_ppt_from_text(document_text)
         with open(ppt_file, "rb") as f:
-            st.download_button("Download PPT", f, file_name="document_summary.pptx")
+            st.download_button("Download PPT", f, file_name="detailed_presentation.pptx")
