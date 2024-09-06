@@ -6,4 +6,3 @@ langchain-google-genai
 python-pptx
 python-docx
 faiss-cpu
-tempfile
