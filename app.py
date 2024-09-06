@@ -128,13 +128,14 @@ elif input_method == "Upload PDFs":
             st.session_state.all_texts = all_texts
             st.success("Index created successfully!")
 
-# Function to separate LaTeX and text
+# Function to separate LaTeX math and text, rendering LaTeX only in math mode
 def render_response(response):
-    # Find LaTeX enclosed in $...$ or $$...$$ and render it separately
+    # Find LaTeX enclosed in $...$ or $$...$$ and render only those as LaTeX math
     parts = re.split(r'(\$.*?\$|\$\$.*?\$\$)', response)
     
     for part in parts:
-        if part.startswith("$") and part.endswith("$"):  # LaTeX math
+        # Handle inline math ($...$) or block math ($$...$$)
+        if part.startswith("$") and part.endswith("$"):  # Math mode
             st.latex(part.strip("$"))
         else:  # Regular text
             st.write(part)
@@ -145,21 +146,17 @@ def handle_question(user_question):
         # Initialize the LLM and create a retrieval chain
         if st.session_state.llm is None:
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
-        
-        qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
-        retriever = st.session_state.faiss_index.as_retriever()
 
-        # Include memory in the chain
-        chain = RetrievalQA(
-            combine_documents_chain=qa_chain,
-            retriever=retriever,
-            memory=st.session_state.memory
-        )
+        # Use FAISS similarity search for retrieving relevant documents
+        retrieved_docs = st.session_state.faiss_index.similarity_search(user_question)
+
+        # Create a retrieval chain with the retrieved documents
+        qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
 
         # Answer the user's question using RAG with memory
         with st.spinner("Generating answer..."):
             try:
-                response = chain.run(user_question)
+                response = qa_chain.run(input_documents=retrieved_docs, question=user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
                 return response  # Return response immediately to display it
@@ -174,7 +171,7 @@ st.write("### Chat History")
 if st.session_state.responses:
     for idx, res in enumerate(st.session_state.responses):
         st.write(f"**You**: {res['question']}")
-        st.write(f"**Assistant**: {res['answer']}")
+        render_response(res['answer'])
         st.write("---")  # Divider between messages
 
 # User question input, placed at the bottom like a chat interface
