@@ -165,7 +165,7 @@ def handle_question():
                 response = chain.run(user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
-                st.session_state.user_question = ""  # Reset the question without modifying widget key directly
+                st.session_state.user_question = ""  # Reset the question safely
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
@@ -193,7 +193,7 @@ if st.session_state.faiss_index:
     # User question input, placed after displaying the responses
     user_question = st.text_area(
         "I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:",
-        value=st.session_state.user_question,
+        value=st.session_state.user_question,  # Get the latest value
         key="user_question",
         placeholder="Ask a question... (Press Enter to submit, Shift+Enter for new line)"
     )
