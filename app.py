@@ -74,6 +74,8 @@ if 'responses' not in st.session_state:
     st.session_state.responses = []  # Store responses across questions
 if 'memory' not in st.session_state:
     st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+if 'user_question' not in st.session_state:
+    st.session_state.user_question = ""  # Initialize user question in session state
 
 # Function to reset session state
 def reset_state():
@@ -141,7 +143,7 @@ def render_response(response):
 
 # Function to handle question submission and answer generation
 def handle_question():
-    user_question = st.session_state['user_question']
+    user_question = st.session_state.user_question
     if user_question:
         # Initialize the LLM and create a retrieval chain
         if st.session_state.llm is None:
@@ -163,7 +165,7 @@ def handle_question():
                 response = chain.run(user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
-                st.session_state['user_question'] = ""  # Clear the input field
+                st.session_state.user_question = ""  # Reset the question without modifying widget key directly
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
@@ -191,6 +193,7 @@ if st.session_state.faiss_index:
     # User question input, placed after displaying the responses
     user_question = st.text_area(
         "I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:",
+        value=st.session_state.user_question,
         key="user_question",
         placeholder="Ask a question... (Press Enter to submit, Shift+Enter for new line)"
     )
