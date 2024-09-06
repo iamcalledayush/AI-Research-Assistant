@@ -11,6 +11,7 @@ from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.memory import ConversationBufferMemory
+from langchain.docstore.document import Document
 
 # Initialize the Google Gemini 1.5 Flash model
 def init_llm(api_key):
@@ -50,7 +51,9 @@ def save_pdf(content):
 # Setup FAISS VectorStore for document retrieval
 def create_faiss_index(texts):
     embeddings = HuggingFaceEmbeddings()
-    faiss_index = FAISS.from_texts(texts, embeddings)
+    # Convert plain text to Document objects required by LangChain FAISS index
+    docs = [Document(page_content=text) for text in texts]
+    faiss_index = FAISS.from_documents(docs, embeddings)
     return faiss_index
 
 # Streamlit app
@@ -148,7 +151,7 @@ def handle_question(user_question):
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
 
         # Use FAISS similarity search for retrieving relevant documents
-        retrieved_docs = st.session_state.faiss_index.similarity_search(user_question)
+        retrieved_docs = st.session_state.faiss_index.similarity_search(user_question, k=3)  # Retrieve top 3 documents
 
         # Create a retrieval chain with the retrieved documents
         qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
