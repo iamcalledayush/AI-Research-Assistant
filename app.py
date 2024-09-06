@@ -139,18 +139,10 @@ def render_response(response):
         else:  # Regular text
             st.write(part)
 
-# Only show the question input and retrieval system if the FAISS index exists
-if st.session_state.faiss_index:
-    # Display all previous responses before the question input
-    for idx, res in enumerate(st.session_state.responses):
-        st.write(f"### Question {idx+1}: {res['question']}")
-        st.write("**Answer:**")
-        render_response(res['answer'])  # Handle LaTeX and regular text rendering
-
-    # User question input, placed after displaying the responses
-    user_question = st.text_input("I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:")
-
-    if st.button("Generate Answer") and user_question:
+# Function to handle question submission and answer generation
+def handle_question():
+    user_question = st.session_state['user_question']
+    if user_question:
         # Initialize the LLM and create a retrieval chain
         if st.session_state.llm is None:
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
@@ -171,5 +163,25 @@ if st.session_state.faiss_index:
                 response = chain.run(user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
+                st.session_state['user_question'] = ""  # Clear the input field
             except Exception as e:
                 st.error(f"An error occurred: {e}")
+
+# Only show the question input and retrieval system if the FAISS index exists
+if st.session_state.faiss_index:
+    # Display all previous responses before the question input
+    for idx, res in enumerate(st.session_state.responses):
+        st.write(f"### Question {idx+1}: {res['question']}")
+        st.write("**Answer:**")
+        render_response(res['answer'])  # Handle LaTeX and regular text rendering
+
+    # User question input, placed after displaying the responses
+    user_question = st.text_area(
+        "I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:",
+        key="user_question",
+        placeholder="Ask a question..."
+    )
+
+    # Button to trigger the response generation
+    if st.button("Generate Answer"):
+        handle_question()
