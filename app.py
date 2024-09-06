@@ -52,7 +52,7 @@ def create_faiss_index(texts):
     return faiss_index
 
 # Streamlit app
-st.title("ArXiv Research Assistant with RAG")
+st.title("Your Own ArXiv Research Assistant")
 
 # Store data in session state to persist across interactions
 if 'faiss_index' not in st.session_state:
@@ -85,7 +85,7 @@ if arxiv_links and st.button("Process Papers"):
 # Only show the question input and retrieval system if the FAISS index exists
 if st.session_state.faiss_index:
     # User question input
-    user_question = st.text_input("Ask a question based on the uploaded documents:")
+    user_question = st.text_input("I can help you do further research based on the uploaded papers. Ask your queries based on the uploaded documents:")
 
     if user_question:
         # Initialize the LLM and create a retrieval chain
