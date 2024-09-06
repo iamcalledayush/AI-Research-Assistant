@@ -76,6 +76,8 @@ if 'memory' not in st.session_state:
     st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 if 'user_question' not in st.session_state:
     st.session_state.user_question = ""  # Initialize user question in session state
+if 'question_submitted' not in st.session_state:
+    st.session_state.question_submitted = False  # Track if the question has been submitted
 
 # Function to reset session state
 def reset_state():
@@ -144,7 +146,7 @@ def render_response(response):
 # Function to handle question submission and answer generation
 def handle_question():
     user_question = st.session_state.user_question
-    if user_question:
+    if user_question and not st.session_state.question_submitted:  # Prevent double submissions
         # Initialize the LLM and create a retrieval chain
         if st.session_state.llm is None:
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
@@ -165,7 +167,7 @@ def handle_question():
                 response = chain.run(user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
-                st.session_state.user_question = ""  # Reset the question safely
+                st.session_state.question_submitted = True  # Mark the question as submitted
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
@@ -201,3 +203,6 @@ if st.session_state.faiss_index:
     # Button to trigger the response generation
     if st.button("Generate Answer"):
         handle_question()
+        # Reset the user_question field and allow further questions to be submitted
+        st.session_state.user_question = ""  # Reset the field only after submission
+        st.session_state.question_submitted = False  # Allow new question to be submitted
