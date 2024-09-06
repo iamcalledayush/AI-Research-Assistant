@@ -10,6 +10,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.memory import ConversationBufferMemory
 
 # Initialize the Google Gemini 1.5 Flash model
 def init_llm(api_key):
@@ -71,6 +72,8 @@ if 'llm' not in st.session_state:
     st.session_state.llm = None
 if 'responses' not in st.session_state:
     st.session_state.responses = []  # Store responses across questions
+if 'memory' not in st.session_state:
+    st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # Function to reset session state
 def reset_state():
@@ -78,6 +81,7 @@ def reset_state():
     st.session_state.all_texts = []
     st.session_state.llm = None
     st.session_state.responses = []  # Clear responses when resetting
+    st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)  # Reset memory
 
 # Choose input method: either arXiv links or PDF upload
 input_method = st.radio("Choose input method:", ("ArXiv Links", "Upload PDFs"), on_change=reset_state)
@@ -137,7 +141,13 @@ def render_response(response):
 
 # Only show the question input and retrieval system if the FAISS index exists
 if st.session_state.faiss_index:
-    # User question input
+    # Display all previous responses before the question input
+    for idx, res in enumerate(st.session_state.responses):
+        st.write(f"### Question {idx+1}: {res['question']}")
+        st.write("**Answer:**")
+        render_response(res['answer'])  # Handle LaTeX and regular text rendering
+
+    # User question input, placed after displaying the responses
     user_question = st.text_input("I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:")
 
     if st.button("Generate Answer") and user_question:
@@ -147,9 +157,15 @@ if st.session_state.faiss_index:
         
         qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
         retriever = st.session_state.faiss_index.as_retriever()
-        chain = RetrievalQA(combine_documents_chain=qa_chain, retriever=retriever)
 
-        # Answer the user's question using RAG
+        # Include memory in the chain
+        chain = RetrievalQA(
+            combine_documents_chain=qa_chain,
+            retriever=retriever,
+            memory=st.session_state.memory
+        )
+
+        # Answer the user's question using RAG with memory
         with st.spinner("Generating answer..."):
             try:
                 response = chain.run(user_question)
@@ -157,9 +173,3 @@ if st.session_state.faiss_index:
                 st.session_state.responses.append({"question": user_question, "answer": response})
             except Exception as e:
                 st.error(f"An error occurred: {e}")
-
-    # Display all previous responses
-    for idx, res in enumerate(st.session_state.responses):
-        st.write(f"### Question {idx+1}: {res['question']}")
-        st.write("**Answer:**")
-        render_response(res['answer'])  # Handle LaTeX and regular text rendering
