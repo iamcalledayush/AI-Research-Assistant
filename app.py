@@ -11,7 +11,6 @@ from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.memory import ConversationBufferMemory
-from langchain.docstore.document import Document
 
 # Initialize the Google Gemini 1.5 Flash model
 def init_llm(api_key):
@@ -51,9 +50,7 @@ def save_pdf(content):
 # Setup FAISS VectorStore for document retrieval
 def create_faiss_index(texts):
     embeddings = HuggingFaceEmbeddings()
-    # Convert plain text to Document objects required by LangChain FAISS index
-    docs = [Document(page_content=text) for text in texts]
-    faiss_index = FAISS.from_documents(docs, embeddings)
+    faiss_index = FAISS.from_texts(texts, embeddings)
     return faiss_index
 
 # Streamlit app
@@ -131,14 +128,13 @@ elif input_method == "Upload PDFs":
             st.session_state.all_texts = all_texts
             st.success("Index created successfully!")
 
-# Function to separate LaTeX math and text, rendering LaTeX only in math mode
+# Function to separate LaTeX and text
 def render_response(response):
-    # Find LaTeX enclosed in $...$ or $$...$$ and render only those as LaTeX math
+    # Find LaTeX enclosed in $...$ or $$...$$ and render it separately
     parts = re.split(r'(\$.*?\$|\$\$.*?\$\$)', response)
     
     for part in parts:
-        # Handle inline math ($...$) or block math ($$...$$)
-        if part.startswith("$") and part.endswith("$"):  # Math mode
+        if part.startswith("$") and part.endswith("$"):  # LaTeX math
             st.latex(part.strip("$"))
         else:  # Regular text
             st.write(part)
@@ -149,43 +145,53 @@ def handle_question(user_question):
         # Initialize the LLM and create a retrieval chain
         if st.session_state.llm is None:
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
-
-        # Use FAISS similarity search for retrieving relevant documents
-        retrieved_docs = st.session_state.faiss_index.similarity_search(user_question, k=3)  # Retrieve top 3 documents
-
-        # Create a retrieval chain with the retrieved documents
+        
         qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
+        retriever = st.session_state.faiss_index.as_retriever()
+
+        # Include memory in the chain
+        chain = RetrievalQA(
+            combine_documents_chain=qa_chain,
+            retriever=retriever,
+            memory=st.session_state.memory
+        )
 
         # Answer the user's question using RAG with memory
         with st.spinner("Generating answer..."):
             try:
-                response = qa_chain.run(input_documents=retrieved_docs, question=user_question)
+                response = chain.run(user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
-                return response  # Return response immediately to display it
             except Exception as e:
                 st.error(f"An error occurred: {e}")
-                return None
 
-# Chat interface setup
-st.write("### Chat History")
-
-# Display chat history (previous responses) at the top
-if st.session_state.responses:
+# Only show the question input and retrieval system if the FAISS index exists
+if st.session_state.faiss_index:
+    # Display all previous responses before the question input
     for idx, res in enumerate(st.session_state.responses):
-        st.write(f"**You**: {res['question']}")
-        render_response(res['answer'])
-        st.write("---")  # Divider between messages
+        st.write(f"### Question {idx+1}: {res['question']}")
+        st.write("**Answer:**")
+        render_response(res['answer'])  # Handle LaTeX and regular text rendering
 
-# User question input, placed at the bottom like a chat interface
-user_question = st.text_area(
-    "Ask your question below:",
-    placeholder="Ask a question... (Press Enter to submit, Shift+Enter for new line)",
-    key="user_question"
-)
+    # Inject JavaScript to detect Shift+Enter for new line and Enter for submit
+    st.markdown("""
+        <script>
+        const textarea = document.querySelector("textarea");
+        textarea.addEventListener("keydown", function(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                document.querySelector("button[aria-label='Generate Answer']").click();
+            }
+        });
+        </script>
+        """, unsafe_allow_html=True)
 
-# Button to trigger the response generation
-if st.button("Send"):
-    response = handle_question(user_question)
-    if response:
-        st.experimental_rerun()  # Refresh to display the new response at the top
+    # User question input, placed after displaying the responses
+    user_question = st.text_area(
+        "I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:",
+        placeholder="Ask a question... (Press Enter to submit, Shift+Enter for new line)"
+    )
+
+    # Button to trigger the response generation
+    if st.button("Generate Answer"):
+        handle_question(user_question)
