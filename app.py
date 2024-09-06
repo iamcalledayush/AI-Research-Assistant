@@ -54,6 +54,12 @@ def create_faiss_index(texts):
 # Streamlit app
 st.title("ArXiv Research Assistant with RAG")
 
+# Store data in session state to persist across interactions
+if 'faiss_index' not in st.session_state:
+    st.session_state.faiss_index = None
+if 'all_texts' not in st.session_state:
+    st.session_state.all_texts = []
+
 # Input arXiv links
 arxiv_links = st.text_area("Enter the arXiv links (one per line):").splitlines()
 
@@ -72,21 +78,28 @@ if arxiv_links and st.button("Process Papers"):
     if all_texts:
         # Create FAISS index with the text extracted from the papers
         st.write("Creating document retrieval index...")
-        faiss_index = create_faiss_index(all_texts)
+        st.session_state.faiss_index = create_faiss_index(all_texts)
+        st.session_state.all_texts = all_texts
         st.success("Index created successfully!")
 
-        # User question input
-        user_question = st.text_input("Ask a question based on the uploaded documents:")
+# Only show the question input and retrieval system if the FAISS index exists
+if st.session_state.faiss_index:
+    # User question input
+    user_question = st.text_input("Ask a question based on the uploaded documents:")
 
-        if user_question:
-            # Initialize the LLM and create a retrieval chain
-            llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
-            qa_chain = load_qa_chain(llm, chain_type="stuff")
+    if user_question:
+        # Initialize the LLM and create a retrieval chain
+        if 'llm' not in st.session_state:
+            st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
+        
+        qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
+        retriever = st.session_state.faiss_index.as_retriever()
+        chain = RetrievalQA(combine_documents_chain=qa_chain, retriever=retriever)
 
-            retriever = faiss_index.as_retriever()
-            chain = RetrievalQA(combine_documents_chain=qa_chain, retriever=retriever)
-
-            # Answer the user's question using RAG
-            with st.spinner("Generating answer..."):
+        # Answer the user's question using RAG
+        with st.spinner("Generating answer..."):
+            try:
                 response = chain.run(user_question)
                 st.write(f"**Answer:** {response}")
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
