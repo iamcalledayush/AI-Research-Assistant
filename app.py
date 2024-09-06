@@ -175,11 +175,24 @@ if st.session_state.faiss_index:
         st.write("**Answer:**")
         render_response(res['answer'])  # Handle LaTeX and regular text rendering
 
+    # Inject JavaScript to detect Shift+Enter for new line and Enter for submit
+    st.markdown("""
+        <script>
+        const textarea = document.querySelector("textarea");
+        textarea.addEventListener("keydown", function(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                document.querySelector("button[aria-label='Generate Answer']").click();
+            }
+        });
+        </script>
+        """, unsafe_allow_html=True)
+
     # User question input, placed after displaying the responses
     user_question = st.text_area(
         "I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:",
         key="user_question",
-        placeholder="Ask a question..."
+        placeholder="Ask a question... (Press Enter to submit, Shift+Enter for new line)"
     )
 
     # Button to trigger the response generation
