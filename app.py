@@ -128,13 +128,14 @@ elif input_method == "Upload PDFs":
             st.session_state.all_texts = all_texts
             st.success("Index created successfully!")
 
-# Function to separate LaTeX and text
+# Function to separate LaTeX math and text, rendering LaTeX only in math mode
 def render_response(response):
-    # Find LaTeX enclosed in $...$ or $$...$$ and render it separately
+    # Find LaTeX enclosed in $...$ or $$...$$ and render only those as LaTeX math
     parts = re.split(r'(\$.*?\$|\$\$.*?\$\$)', response)
     
     for part in parts:
-        if part.startswith("$") and part.endswith("$"):  # LaTeX math
+        # Handle inline math ($...$) or block math ($$...$$)
+        if part.startswith("$") and part.endswith("$"):  # Math mode
             st.latex(part.strip("$"))
         else:  # Regular text
             st.write(part)
@@ -174,7 +175,7 @@ st.write("### Chat History")
 if st.session_state.responses:
     for idx, res in enumerate(st.session_state.responses):
         st.write(f"**You**: {res['question']}")
-        st.write(f"**Assistant**: {res['answer']}")
+        render_response(res['answer'])
         st.write("---")  # Divider between messages
 
 # User question input, placed at the bottom like a chat interface
