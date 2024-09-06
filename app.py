@@ -56,8 +56,9 @@ st.title("AI-Powered ArXiv and Document Research Assistant")
 
 st.write(
     """
-    This tool allows you to input arXiv links or upload PDFs, and then ask questions based on the contents of those documents.
+    This tool allows you to input multiple arXiv links or upload multiple PDFs, and then ask questions based on the contents of those documents.
     It uses Retrieval-Augmented Generation (RAG) to retrieve relevant information from the documents and provide intelligent responses.
+    There is LaTeX support as well, so each LaTeX symbol is compiled in Math mode before displaying it to you.
     """
 )
 
@@ -68,17 +69,20 @@ if 'all_texts' not in st.session_state:
     st.session_state.all_texts = []
 if 'llm' not in st.session_state:
     st.session_state.llm = None
+if 'responses' not in st.session_state:
+    st.session_state.responses = []  # Store responses across questions
 
 # Function to reset session state
 def reset_state():
     st.session_state.faiss_index = None
     st.session_state.all_texts = []
     st.session_state.llm = None
+    st.session_state.responses = []  # Clear responses when resetting
 
 # Choose input method: either arXiv links or PDF upload
-input_method = st.radio("Choose input method:", ("arXiv Links", "Upload PDFs"), on_change=reset_state)
+input_method = st.radio("Choose input method:", ("ArXiv Links", "Upload PDFs"), on_change=reset_state)
 
-if input_method == "arXiv Links":
+if input_method == "ArXiv Links":
     # Input arXiv links
     arxiv_links = st.text_area("Enter the arXiv links (one per line):").splitlines()
 
@@ -138,6 +142,13 @@ if st.session_state.faiss_index:
         with st.spinner("Generating answer..."):
             try:
                 response = chain.run(user_question)
-                st.write(f"**Answer:** {response}")
+                # Append the new response to the list of responses
+                st.session_state.responses.append({"question": user_question, "answer": response})
             except Exception as e:
                 st.error(f"An error occurred: {e}")
+
+    # Display all previous responses, including LaTeX support
+    for idx, res in enumerate(st.session_state.responses):
+        st.write(f"### Question {idx+1}: {res['question']}")
+        st.write(f"**Answer**: {res['answer']}")
+        st.latex(res['answer'])  # In case the response contains LaTeX
