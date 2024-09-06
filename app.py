@@ -60,32 +60,54 @@ if 'faiss_index' not in st.session_state:
 if 'all_texts' not in st.session_state:
     st.session_state.all_texts = []
 
-# Input arXiv links
-arxiv_links = st.text_area("Enter the arXiv links (one per line):").splitlines()
+# Choose input method: either arXiv links or PDF upload
+input_method = st.radio("Choose input method:", ("arXiv Links", "Upload PDFs"))
 
-if arxiv_links and st.button("Process Papers"):
-    all_texts = []
-    
-    for link in arxiv_links:
-        with st.spinner(f"Processing {link}..."):
-            pdf_content = download_pdf(link)
-            if pdf_content:
-                pdf_file_path = save_pdf(pdf_content)
-                with open(pdf_file_path, "rb") as pdf_file:
-                    text = extract_text_from_pdf(pdf_file)
-                    all_texts.append(text)
-    
-    if all_texts:
-        # Create FAISS index with the text extracted from the papers
-        st.write("Creating document retrieval index...")
-        st.session_state.faiss_index = create_faiss_index(all_texts)
-        st.session_state.all_texts = all_texts
-        st.success("Index created successfully!")
+if input_method == "arXiv Links":
+    # Input arXiv links
+    arxiv_links = st.text_area("Enter the arXiv links (one per line):").splitlines()
+
+    if arxiv_links and st.button("Process Papers"):
+        all_texts = []
+        
+        for link in arxiv_links:
+            with st.spinner(f"Processing {link}..."):
+                pdf_content = download_pdf(link)
+                if pdf_content:
+                    pdf_file_path = save_pdf(pdf_content)
+                    with open(pdf_file_path, "rb") as pdf_file:
+                        text = extract_text_from_pdf(pdf_file)
+                        all_texts.append(text)
+        
+        if all_texts:
+            # Create FAISS index with the text extracted from the papers
+            st.write("Creating document retrieval index...")
+            st.session_state.faiss_index = create_faiss_index(all_texts)
+            st.session_state.all_texts = all_texts
+            st.success("Index created successfully!")
+
+elif input_method == "Upload PDFs":
+    uploaded_files = st.file_uploader("Upload PDF documents", accept_multiple_files=True, type=["pdf"])
+
+    if uploaded_files and st.button("Process Uploaded PDFs"):
+        all_texts = []
+        
+        for uploaded_file in uploaded_files:
+            with st.spinner(f"Processing {uploaded_file.name}..."):
+                text = extract_text_from_pdf(uploaded_file)
+                all_texts.append(text)
+        
+        if all_texts:
+            # Create FAISS index with the text extracted from the uploaded PDFs
+            st.write("Creating document retrieval index...")
+            st.session_state.faiss_index = create_faiss_index(all_texts)
+            st.session_state.all_texts = all_texts
+            st.success("Index created successfully!")
 
 # Only show the question input and retrieval system if the FAISS index exists
 if st.session_state.faiss_index:
     # User question input
-    user_question = st.text_input("I can help you do further research based on the uploaded papers. Ask your queries based on the uploaded documents:")
+    user_question = st.text_input("I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:")
 
     if user_question:
         # Initialize the LLM and create a retrieval chain
