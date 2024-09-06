@@ -52,16 +52,31 @@ def create_faiss_index(texts):
     return faiss_index
 
 # Streamlit app
-st.title("Your Own ArXiv Research Assistant")
+st.title("AI-Powered ArXiv and Document Research Assistant")
+
+st.write(
+    """
+    This tool allows you to input arXiv links or upload PDFs, and then ask questions based on the contents of those documents.
+    It uses Retrieval-Augmented Generation (RAG) to retrieve relevant information from the documents and provide intelligent responses.
+    """
+)
 
 # Store data in session state to persist across interactions
 if 'faiss_index' not in st.session_state:
     st.session_state.faiss_index = None
 if 'all_texts' not in st.session_state:
     st.session_state.all_texts = []
+if 'llm' not in st.session_state:
+    st.session_state.llm = None
+
+# Function to reset session state
+def reset_state():
+    st.session_state.faiss_index = None
+    st.session_state.all_texts = []
+    st.session_state.llm = None
 
 # Choose input method: either arXiv links or PDF upload
-input_method = st.radio("Choose input method:", ("arXiv Links", "Upload PDFs"))
+input_method = st.radio("Choose input method:", ("arXiv Links", "Upload PDFs"), on_change=reset_state)
 
 if input_method == "arXiv Links":
     # Input arXiv links
@@ -110,9 +125,9 @@ if st.session_state.faiss_index:
     # User question input
     user_question = st.text_input("I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:")
 
-    if user_question:
+    if st.button("Generate Answer") and user_question:
         # Initialize the LLM and create a retrieval chain
-        if 'llm' not in st.session_state:
+        if st.session_state.llm is None:
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
         
         qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
