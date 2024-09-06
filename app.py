@@ -162,8 +162,10 @@ def handle_question(user_question):
                 response = chain.run(user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
+                return response  # Return response immediately to display it
             except Exception as e:
                 st.error(f"An error occurred: {e}")
+                return None
 
 # Only show the question input and retrieval system if the FAISS index exists
 if st.session_state.faiss_index:
@@ -194,4 +196,8 @@ if st.session_state.faiss_index:
 
     # Button to trigger the response generation
     if st.button("Generate Answer"):
-        handle_question(user_question)
+        response = handle_question(user_question)
+        if response:
+            st.write(f"### Your Question: {user_question}")
+            st.write("**Answer:**")
+            render_response(response)
