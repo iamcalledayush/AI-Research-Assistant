@@ -87,6 +87,7 @@ if input_method == "arXiv Links":
             st.success("Index created successfully!")
 
 elif input_method == "Upload PDFs":
+    # Upload PDF documents
     uploaded_files = st.file_uploader("Upload PDF documents", accept_multiple_files=True, type=["pdf"])
 
     if uploaded_files and st.button("Process Uploaded PDFs"):
