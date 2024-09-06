@@ -167,37 +167,25 @@ def handle_question(user_question):
                 st.error(f"An error occurred: {e}")
                 return None
 
-# Only show the question input and retrieval system if the FAISS index exists
-if st.session_state.faiss_index:
-    # Display all previous responses before the question input
+# Chat interface setup
+st.write("### Chat History")
+
+# Display chat history (previous responses) at the top
+if st.session_state.responses:
     for idx, res in enumerate(st.session_state.responses):
-        st.write(f"### Question {idx+1}: {res['question']}")
-        st.write("**Answer:**")
-        render_response(res['answer'])  # Handle LaTeX and regular text rendering
+        st.write(f"**You**: {res['question']}")
+        st.write(f"**Assistant**: {res['answer']}")
+        st.write("---")  # Divider between messages
 
-    # Inject JavaScript to detect Shift+Enter for new line and Enter for submit
-    st.markdown("""
-        <script>
-        const textarea = document.querySelector("textarea");
-        textarea.addEventListener("keydown", function(event) {
-            if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                document.querySelector("button[aria-label='Generate Answer']").click();
-            }
-        });
-        </script>
-        """, unsafe_allow_html=True)
+# User question input, placed at the bottom like a chat interface
+user_question = st.text_area(
+    "Ask your question below:",
+    placeholder="Ask a question... (Press Enter to submit, Shift+Enter for new line)",
+    key="user_question"
+)
 
-    # User question input, placed after displaying the responses
-    user_question = st.text_area(
-        "I can help you do further research based on the uploaded documents. Ask your queries based on the uploaded documents:",
-        placeholder="Ask a question... (Press Enter to submit, Shift+Enter for new line)"
-    )
-
-    # Button to trigger the response generation
-    if st.button("Generate Answer"):
-        response = handle_question(user_question)
-        if response:
-            st.write(f"### Your Question: {user_question}")
-            st.write("**Answer:**")
-            render_response(response)
+# Button to trigger the response generation
+if st.button("Send"):
+    response = handle_question(user_question)
+    if response:
+        st.experimental_rerun()  # Refresh to display the new response at the top
