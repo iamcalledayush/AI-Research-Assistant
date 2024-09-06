@@ -3,6 +3,7 @@ import PyPDF2
 import requests
 import os
 import tempfile
+import re
 from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
@@ -56,9 +57,8 @@ st.title("AI-Powered ArXiv and Document Research Assistant")
 
 st.write(
     """
-    This tool allows you to input multiple arXiv links or upload multiple PDFs, and then ask questions based on the contents of those documents.
+    This tool allows you to input arXiv links or upload PDFs, and then ask questions based on the contents of those documents.
     It uses Retrieval-Augmented Generation (RAG) to retrieve relevant information from the documents and provide intelligent responses.
-    There is LaTeX support as well, so each LaTeX symbol is compiled in Math mode before displaying it to you.
     """
 )
 
@@ -124,6 +124,17 @@ elif input_method == "Upload PDFs":
             st.session_state.all_texts = all_texts
             st.success("Index created successfully!")
 
+# Function to separate LaTeX and text
+def render_response(response):
+    # Find LaTeX enclosed in $...$ or $$...$$ and render it separately
+    parts = re.split(r'(\$.*?\$|\$\$.*?\$\$)', response)
+    
+    for part in parts:
+        if part.startswith("$") and part.endswith("$"):  # LaTeX math
+            st.latex(part.strip("$"))
+        else:  # Regular text
+            st.write(part)
+
 # Only show the question input and retrieval system if the FAISS index exists
 if st.session_state.faiss_index:
     # User question input
@@ -147,8 +158,8 @@ if st.session_state.faiss_index:
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
-    # Display all previous responses, including LaTeX support
+    # Display all previous responses
     for idx, res in enumerate(st.session_state.responses):
         st.write(f"### Question {idx+1}: {res['question']}")
-        st.write(f"**Answer**: {res['answer']}")
-        st.latex(res['answer'])  # In case the response contains LaTeX
+        st.write("**Answer:**")
+        render_response(res['answer'])  # Handle LaTeX and regular text rendering
