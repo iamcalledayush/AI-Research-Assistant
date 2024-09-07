@@ -163,7 +163,7 @@ def handle_question(user_question):
                 response = chain.run(user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
-                st.experimental_rerun()  # Refresh the app to display the response immediately
+                st.rerun()  # Refresh the app to display the response immediately
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
