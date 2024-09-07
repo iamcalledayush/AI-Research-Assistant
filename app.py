@@ -1,17 +1,15 @@
 import streamlit as st
 import PyPDF2
 import requests
-import os
 import tempfile
 import re
 from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.prompts import PromptTemplate
-from langchain.chains import ConversationalRetrievalChain
-from langchain.chains.question_answering import load_qa_chain
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.chains import create_history_aware_retriever, create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.memory import ConversationBufferMemory
-from langchain import LLMChain
 
 # Initialize the Google Gemini 1.5 Flash model
 def init_llm(api_key):
@@ -150,19 +148,57 @@ def handle_question(user_question):
         
         retriever = st.session_state.faiss_index.as_retriever()
 
-        # Create a conversational retrieval chain that integrates memory
-        chain = ConversationalRetrievalChain(
-            llm=st.session_state.llm,
-            retriever=retriever,
-            memory=st.session_state.memory
+        # Create history-aware retriever and QA chain
+        contextualize_q_system_prompt = (
+            "Given a chat history and the latest user question "
+            "which might reference context in the chat history, "
+            "formulate a standalone question which can be understood "
+            "without the chat history. Do NOT answer the question, just "
+            "reformulate it if needed and otherwise return it as is."
+        )
+        contextualize_q_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", contextualize_q_system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "{input}")
+            ]
+        )
+        
+        history_aware_retriever = create_history_aware_retriever(
+            st.session_state.llm,
+            retriever,
+            contextualize_q_prompt
+        )
+        
+        qa_system_prompt = (
+            "You are an assistant for question-answering tasks. Use "
+            "the following pieces of retrieved context to answer the "
+            "question. If you don't know the answer, just say that you "
+            "don't know. Use three sentences maximum and keep the answer "
+            "concise."
+        )
+        qa_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", qa_system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "{input}")
+            ]
+        )
+        question_answer_chain = create_stuff_documents_chain(
+            st.session_state.llm, qa_prompt
+        )
+
+        rag_chain = create_retrieval_chain(
+            history_aware_retriever,
+            question_answer_chain
         )
 
         # Answer the user's question using RAG with memory
         with st.spinner("Generating answer..."):
             try:
-                response = chain.run({"question": user_question})
+                response = rag_chain.invoke({"input": user_question, "chat_history": st.session_state.memory.chat_memory})
                 # Append the new response to the list of responses
-                st.session_state.responses.append({"question": user_question, "answer": response})
+                st.session_state.responses.append({"question": user_question, "answer": response["answer"]})
                 st.rerun()  # Refresh the app to display the response immediately
             except Exception as e:
                 st.error(f"An error occurred: {e}")
