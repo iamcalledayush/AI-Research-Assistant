@@ -10,6 +10,7 @@ from langchain.chains import create_history_aware_retriever, create_retrieval_ch
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.memory import ConversationBufferMemory
+from langchain_core.documents import Document
 
 # Initialize the Google Gemini 1.5 Flash model
 def init_llm(api_key):
@@ -170,6 +171,7 @@ def handle_question(user_question):
             contextualize_q_prompt
         )
         
+        # Create the QA system prompt for answering questions from documents
         qa_system_prompt = (
             "You are an assistant for question-answering tasks. Use "
             "the following pieces of retrieved context to answer the "
@@ -184,10 +186,15 @@ def handle_question(user_question):
                 ("human", "{input}")
             ]
         )
+
+        # Create a document chain that handles multiple documents
         question_answer_chain = create_stuff_documents_chain(
-            st.session_state.llm, qa_prompt
+            st.session_state.llm, 
+            qa_prompt,
+            document_variable_name="context"
         )
 
+        # Create the final RAG chain
         rag_chain = create_retrieval_chain(
             history_aware_retriever,
             question_answer_chain
