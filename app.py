@@ -11,6 +11,7 @@ from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.memory import ConversationBufferMemory
+from langchain import LLMChain
 
 # Initialize the Google Gemini 1.5 Flash model
 def init_llm(api_key):
@@ -147,10 +148,27 @@ def handle_question(user_question):
         if st.session_state.llm is None:
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
         
-        qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
+        # Create a question-answering chain with memory
+        prompt_template = PromptTemplate(
+            input_variables=["chat_history", "question"],
+            template="""
+            Given the following conversation history and the new question, answer the question. 
+            
+            Conversation history:
+            {chat_history}
+            
+            New question: {question}
+            """)
+        
+        qa_chain = LLMChain(
+            llm=st.session_state.llm,
+            prompt=prompt_template,
+            memory=st.session_state.memory
+        )
+        
         retriever = st.session_state.faiss_index.as_retriever()
 
-        # Include memory in the chain
+        # Create a RetrievalQA chain that integrates memory for context
         chain = RetrievalQA(
             combine_documents_chain=qa_chain,
             retriever=retriever,
@@ -160,7 +178,7 @@ def handle_question(user_question):
         # Answer the user's question using RAG with memory
         with st.spinner("Generating answer..."):
             try:
-                response = chain.run(user_question)
+                response = chain.run({"question": user_question})
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
                 st.rerun()  # Refresh the app to display the response immediately
