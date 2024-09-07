@@ -128,13 +128,14 @@ elif input_method == "Upload PDFs":
             st.session_state.all_texts = all_texts
             st.success("Index created successfully!")
 
-# Function to separate LaTeX and text
+# Function to separate LaTeX math and text, rendering LaTeX only in math mode
 def render_response(response):
-    # Find LaTeX enclosed in $...$ or $$...$$ and render it separately
+    # Find LaTeX enclosed in $...$ or $$...$$ and render only those as LaTeX math
     parts = re.split(r'(\$.*?\$|\$\$.*?\$\$)', response)
     
     for part in parts:
-        if part.startswith("$") and part.endswith("$"):  # LaTeX math
+        # Handle inline math ($...$) or block math ($$...$$)
+        if part.startswith("$") and part.endswith("$"):  # Math mode
             st.latex(part.strip("$"))
         else:  # Regular text
             st.write(part)
@@ -162,10 +163,8 @@ def handle_question(user_question):
                 response = chain.run(user_question)
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
-                return response  # Return response immediately to display it
             except Exception as e:
                 st.error(f"An error occurred: {e}")
-                return None
 
 # Only show the question input and retrieval system if the FAISS index exists
 if st.session_state.faiss_index:
@@ -196,8 +195,4 @@ if st.session_state.faiss_index:
 
     # Button to trigger the response generation
     if st.button("Generate Answer"):
-        response = handle_question(user_question)
-        if response:
-            st.write(f"### Your Question: {user_question}")
-            st.write("**Answer:**")
-            render_response(response)
+        handle_question(user_question)
