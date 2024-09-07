@@ -7,7 +7,7 @@ import re
 from langchain.vectorstores import FAISS
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
+from langchain.chains import ConversationalRetrievalChain
 from langchain.chains.question_answering import load_qa_chain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.memory import ConversationBufferMemory
@@ -148,29 +148,11 @@ def handle_question(user_question):
         if st.session_state.llm is None:
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
         
-        # Create a question-answering chain with memory
-        prompt_template = PromptTemplate(
-            input_variables=["chat_history", "question"],
-            template="""
-            Given the following conversation history and the new question, answer the question. 
-            
-            Conversation history:
-            {chat_history}
-            
-            New question: {question}
-            """)
-        
-        qa_chain = LLMChain(
-            llm=st.session_state.llm,
-            prompt=prompt_template,
-            memory=st.session_state.memory
-        )
-        
         retriever = st.session_state.faiss_index.as_retriever()
 
-        # Create a RetrievalQA chain that integrates memory for context
-        chain = RetrievalQA(
-            combine_documents_chain=qa_chain,
+        # Create a conversational retrieval chain that integrates memory
+        chain = ConversationalRetrievalChain(
+            llm=st.session_state.llm,
             retriever=retriever,
             memory=st.session_state.memory
         )
