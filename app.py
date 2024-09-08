@@ -150,13 +150,13 @@ def handle_question(user_question):
         
         retriever = st.session_state.faiss_index.as_retriever()
 
-        # Create a system prompt to reformulate follow-up questions based on chat history
-        reformulate_prompt = ChatPromptTemplate.from_messages([
-            ("system", "Given the chat history and the latest user question, reformulate the user question to include reference to the previous context:"),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}")
-        ])
-        
+        # Reformulate follow-up questions based on previous response, not entire chat history
+        if len(st.session_state.responses) > 0:
+            last_response = st.session_state.responses[-1]['answer']
+            reformulated_question = f"The user is referring to your previous response: '{last_response}'. Now, they are asking: '{user_question}'."
+        else:
+            reformulated_question = user_question
+
         # Create a memory-aware retriever chain
         qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
 
@@ -173,32 +173,14 @@ def handle_question(user_question):
                 # Save the user's question in memory
                 st.session_state.memory.chat_memory.add_user_message(user_question)
 
-                # Debugging: Display chat history to check memory
-                st.write(f"Chat history: {st.session_state.memory.chat_memory.messages}")
-                
-                # Reformulate follow-up questions with chat history
-                reformulated_question = reformulate_prompt.invoke({
-                    "input": user_question,
-                    "chat_history": st.session_state.memory.chat_memory.messages
-                })
-
-                # Debugging: Display the reformulated question
-                st.write(f"Reformulated Question: {reformulated_question}")
-
-                # Extract the actual reformulated question content
-                reformulated_question_content = reformulated_question.messages[-1].content
-
                 # Get response based on reformulated question
-                response = chain.run(reformulated_question_content)
+                response = chain.run(reformulated_question)
                 
                 # Save the assistant's response in memory
                 st.session_state.memory.chat_memory.add_ai_message(response)
 
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
-
-                # Debugging: Display the response
-                st.write(f"Response: {response}")
 
                 return response  # Return response immediately to display it
             except Exception as e:
