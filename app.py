@@ -11,6 +11,7 @@ from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.memory import ConversationBufferMemory
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 # Initialize the Google Gemini 1.5 Flash model
 def init_llm(api_key):
@@ -147,8 +148,17 @@ def handle_question(user_question):
         if st.session_state.llm is None:
             st.session_state.llm = init_llm("AIzaSyBoX4UUHV5FO4lvYwdkSz6R5nlxLadTHnU")  # Use your API key
         
-        qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
         retriever = st.session_state.faiss_index.as_retriever()
+
+        # Create a system prompt to reformulate follow-up questions based on chat history
+        reformulate_prompt = ChatPromptTemplate.from_messages([
+            ("system", "Given the chat history and the latest user question, reformulate the user question as a standalone question:"),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}")
+        ])
+        
+        # Create a memory-aware retriever chain
+        qa_chain = load_qa_chain(st.session_state.llm, chain_type="stuff")
 
         # Include memory in the chain
         chain = RetrievalQA(
@@ -162,7 +172,16 @@ def handle_question(user_question):
             try:
                 # Save the user's question in memory
                 st.session_state.memory.chat_memory.add_user_message(user_question)
-                response = chain.run(user_question)
+                
+                # Reformulate follow-up questions with chat history
+                reformulated_question = reformulate_prompt.invoke({
+                    "input": user_question,
+                    "chat_history": st.session_state.memory.chat_memory.messages
+                })
+                
+                # Get response based on reformulated question
+                response = chain.run(reformulated_question)
+                
                 # Save the assistant's response in memory
                 st.session_state.memory.chat_memory.add_ai_message(response)
 
