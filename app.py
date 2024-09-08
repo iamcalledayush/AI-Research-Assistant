@@ -152,7 +152,7 @@ def handle_question(user_question):
 
         # Create a system prompt to reformulate follow-up questions based on chat history
         reformulate_prompt = ChatPromptTemplate.from_messages([
-            ("system", "Given the chat history and the latest user question, reformulate the user question as a standalone question:"),
+            ("system", "Given the chat history and the latest user question, reformulate the user question as a standalone question with previous context:"),
             MessagesPlaceholder("chat_history"),
             ("human", "{input}")
         ])
