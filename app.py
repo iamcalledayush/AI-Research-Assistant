@@ -178,9 +178,12 @@ def handle_question(user_question):
                     "input": user_question,
                     "chat_history": st.session_state.memory.chat_memory.messages
                 })
-                
+
+                # Extract the actual reformulated question content
+                reformulated_question_content = reformulated_question.messages[-1].content
+
                 # Get response based on reformulated question
-                response = chain.run(reformulated_question)
+                response = chain.run(reformulated_question_content)
                 
                 # Save the assistant's response in memory
                 st.session_state.memory.chat_memory.add_ai_message(response)
