@@ -172,12 +172,18 @@ def handle_question(user_question):
             try:
                 # Save the user's question in memory
                 st.session_state.memory.chat_memory.add_user_message(user_question)
+
+                # Debugging: Display chat history to check memory
+                st.write(f"Chat history: {st.session_state.memory.chat_memory.messages}")
                 
                 # Reformulate follow-up questions with chat history
                 reformulated_question = reformulate_prompt.invoke({
                     "input": user_question,
                     "chat_history": st.session_state.memory.chat_memory.messages
                 })
+
+                # Debugging: Display the reformulated question
+                st.write(f"Reformulated Question: {reformulated_question}")
 
                 # Extract the actual reformulated question content
                 reformulated_question_content = reformulated_question.messages[-1].content
@@ -190,6 +196,10 @@ def handle_question(user_question):
 
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
+
+                # Debugging: Display the response
+                st.write(f"Response: {response}")
+
                 return response  # Return response immediately to display it
             except Exception as e:
                 st.error(f"An error occurred: {e}")
