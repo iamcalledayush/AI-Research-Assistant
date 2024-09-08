@@ -73,6 +73,7 @@ if 'llm' not in st.session_state:
 if 'responses' not in st.session_state:
     st.session_state.responses = []  # Store responses across questions
 if 'memory' not in st.session_state:
+    # Initialize memory to track conversation context
     st.session_state.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
 # Function to reset session state
@@ -159,7 +160,12 @@ def handle_question(user_question):
         # Answer the user's question using RAG with memory
         with st.spinner("Generating answer..."):
             try:
+                # Save the user's question in memory
+                st.session_state.memory.chat_memory.add_user_message(user_question)
                 response = chain.run(user_question)
+                # Save the assistant's response in memory
+                st.session_state.memory.chat_memory.add_ai_message(response)
+
                 # Append the new response to the list of responses
                 st.session_state.responses.append({"question": user_question, "answer": response})
                 return response  # Return response immediately to display it
