@@ -59,7 +59,7 @@ st.title("AI-Powered ArXiv and Document Research Assistant")
 
 st.write(
     """
-    This tool allows you to input arXiv links or upload PDFs, and then ask questions based on the contents of those documents.
+    This tool allows you to input multiple arXiv links or upload multiple PDFs, and then ask questions based on the contents of those documents.
     It uses Retrieval-Augmented Generation (RAG) to retrieve relevant information from the documents and provide intelligent responses.
     """
 )
