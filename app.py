@@ -89,10 +89,12 @@ def reset_state():
 input_method = st.radio("Choose input method:", ("ArXiv Links", "Upload PDFs"), on_change=reset_state)
 
 if input_method == "ArXiv Links":
-    # Input arXiv links
-    arxiv_links = st.text_area("Enter the arXiv links (one per line):").splitlines()
+    with st.form(key='arxiv_form'):
+        # Input arXiv links
+        arxiv_links = st.text_area("Enter the arXiv links (one per line):").splitlines()
+        submit_button = st.form_submit_button(label="Process Papers")
 
-    if arxiv_links and st.button("Process Papers"):
+    if arxiv_links and submit_button:
         all_texts = []
         
         for link in arxiv_links:
