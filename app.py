@@ -152,7 +152,7 @@ def handle_question(user_question):
     if user_question:  # Prevent empty submissions
         # Initialize the LLM and create a retrieval chain
         if st.session_state.llm is None:
-            st.session_state.llm = init_llm("AIzaSyCXm1kxLivo3IlTO_GwFkAMFqAEKwNpdaE")  # Use your API key
+            st.session_state.llm = init_llm("AIzaSyCWx10Gq5NWzKHZH4Nn7-2OxC1EVm-t8bA")  # Use your API key
         
         retriever = st.session_state.faiss_index.as_retriever()
 
