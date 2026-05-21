@@ -1,7 +1,8 @@
 streamlit
 langchain==0.2.16
 langchain-community==0.2.16
-langchain-google-genai==1.0.10
+langchain-openai
+openai
 langchain-huggingface==0.0.3
 PyPDF2
 requests
