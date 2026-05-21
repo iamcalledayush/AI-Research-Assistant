@@ -8,13 +8,13 @@ from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 
-# Initialize the Google Gemini 1.5 Flash model
+# Initialize the OpenAI GPT-4o Mini model
 def init_llm(api_key):
-    return ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+    return ChatOpenAI(
+        model="gpt-4o-mini",
         api_key=api_key,
         temperature=0.8,
         max_tokens=500,
@@ -150,7 +150,7 @@ def handle_question(user_question):
     if user_question:  # Prevent empty submissions
         # Initialize the LLM and create a retrieval chain
         if st.session_state.llm is None:
-            st.session_state.llm = init_llm("AIzaSyAM_qsnPaJakC58MOnEr9sg5aUfcw0SZTY")  # Use your API key
+            st.session_state.llm = init_llm(st.secrets["OPENAI_API_KEY"])
         
         retriever = st.session_state.faiss_index.as_retriever()
 
