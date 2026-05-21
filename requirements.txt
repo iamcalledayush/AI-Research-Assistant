@@ -10,3 +10,5 @@ sentence-transformers
 transformers
 python-pptx
 python-docx
+torch
+torchvision
